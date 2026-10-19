@@ -13,6 +13,7 @@ smartenergy-hub/
 ├── collector-service/     (port 8081) - Collecte les données énergétiques
 ├── storage-service/       (port 8082) - Stocke les données dans MongoDB/Redis/Cassandra
 ├── analytics-service/     (port 8083) - API de lecture pour l'analyse
+├── frontend/              (À venir) - Interface utilisateur pour visualiser les données
 ├── simulator/             (Python) - Simulateur de données énergétiques
 └── scripts/
     └── init-cassandra.cql
