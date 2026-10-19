@@ -1,14 +1,14 @@
--- Cassandra Keyspace and Tables Initialization for Smart Energy Hub
+-- Initialisation du Keyspace et des Tables Cassandra pour Smart Energy Hub
 
--- Create keyspace if not exists
+-- Créer le keyspace s'il n'existe pas
 CREATE KEYSPACE IF NOT EXISTS smartenergy
 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}
 AND durable_writes = true;
 
--- Use the keyspace
+-- Utiliser le keyspace
 USE smartenergy;
 
--- Create energy readings table (time-series data)
+-- Créer la table des lectures énergétiques (données de séries temporelles)
 CREATE TABLE IF NOT EXISTS energy_readings (
     device_id text,
     timestamp timestamp,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS energy_readings (
 AND compaction = {'class': 'TimeWindowCompactionStrategy'}
 AND gc_grace_seconds = 864000;
 
--- Create device metadata table
+-- Créer la table des métadonnées des appareils
 CREATE TABLE IF NOT EXISTS devices (
     device_id text PRIMARY KEY,
     device_name text,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS devices (
     last_seen timestamp
 );
 
--- Create daily aggregation table
+-- Créer la table d'agrégation quotidienne
 CREATE TABLE IF NOT EXISTS daily_energy_summary (
     device_id text,
     date text,
@@ -43,10 +43,10 @@ CREATE TABLE IF NOT EXISTS daily_energy_summary (
     PRIMARY KEY ((device_id), date)
 ) WITH CLUSTERING ORDER BY (date DESC);
 
--- Create index on device type for queries
+-- Créer un index sur le type d'appareil pour les requêtes
 CREATE INDEX IF NOT EXISTS idx_device_type ON devices (device_type);
 
--- Insert sample device data
+-- Insérer des données d'appareils d'exemple
 INSERT INTO devices (device_id, device_name, device_type, location, created_at, last_seen)
 VALUES ('device_1', 'Smart Meter 1', 'meter', 'Building A', toTimestamp(now()), toTimestamp(now()));
 

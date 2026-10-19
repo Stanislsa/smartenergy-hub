@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Energy Data Simulator
-Generates simulated energy consumption data for testing
+Simulateur de Données Énergétiques
+Génère des données de consommation énergétique simulées pour les tests
 """
 
 import random
@@ -16,7 +16,7 @@ class EnergySimulator:
         self.devices = [f"device_{i}" for i in range(1, num_devices + 1)]
 
     def generate_reading(self, device_id: str) -> Dict:
-        """Generate a single energy reading for a device"""
+        """Génère une seule lecture énergétique pour un appareil"""
         return {
             "device_id": device_id,
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -27,7 +27,7 @@ class EnergySimulator:
         }
 
     def generate_batch(self, batch_size: int = 100) -> List[Dict]:
-        """Generate a batch of energy readings"""
+        """Génère un lot de lectures énergétiques"""
         readings = []
         for _ in range(batch_size):
             device = random.choice(self.devices)
@@ -35,10 +35,10 @@ class EnergySimulator:
         return readings
 
     def stream_readings(self, interval_seconds: float = 1.0):
-        """Stream energy readings continuously"""
-        print(f"Starting energy simulator for {self.num_devices} devices...")
-        print(f"Streaming readings every {interval_seconds} seconds")
-        print("Press Ctrl+C to stop")
+        """Diffuse en continu des lectures énergétiques"""
+        print(f"Démarrage du simulateur énergétique pour {self.num_devices} appareils...")
+        print(f"Diffusion des lectures toutes les {interval_seconds} secondes")
+        print("Appuyez sur Ctrl+C pour arrêter")
 
         try:
             while True:
@@ -46,7 +46,7 @@ class EnergySimulator:
                 print(json.dumps(reading))
                 time.sleep(interval_seconds)
         except KeyboardInterrupt:
-            print("\nSimulator stopped")
+            print("\nSimulateur arrêté")
 
 if __name__ == "__main__":
     simulator = EnergySimulator(num_devices=10)
