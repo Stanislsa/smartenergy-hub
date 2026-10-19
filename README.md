@@ -4,16 +4,53 @@ Projet multi-module Spring Boot pour la collecte, le stockage et l'analyse des d
 
 ## 🏗️ Architecture
 
+### Structure du projet
+
 ```
 smartenergy-hub/
 ├── pom.xml                 (POM parent)
 ├── docker-compose.yml      (MongoDB, Redis, Cassandra)
 ├── collector-service/     (port 8081) - Collecte les données énergétiques
-├── storage-service/       (port 8082) - Stocke les données dans MongoDB/Redis
+├── storage-service/       (port 8082) - Stocke les données dans MongoDB/Redis/Cassandra
 ├── analytics-service/     (port 8083) - API de lecture pour l'analyse
 ├── simulator/             (Python) - Simulateur de données énergétiques
 └── scripts/
     └── init-cassandra.cql
+```
+
+### Architecture REST API
+
+```
+[ User ]
+   ↕
+[ Frontend Application ]
+   ↕  (API Call)
++--------------------------------------------------+
+| REST API                                         |
+|                                                  |
+|   [ Controller ]                                 |
+|         ↕                                        |
+|   [ Service ]    ────────⬄   [ DTO ]             |
+|         ↕                                        |
+|   [ Repository ] ────────⬄   [ Entities ]        |
++--------------------------------------------------+
+   ↕
+[ Database ]
+```
+
+```mermaid
+graph TD
+    User<-->Frontend[Frontend Application]
+    Frontend<-->|API Call|Controller[Controller]
+
+    subgraph REST API
+        Controller<-->Service[Service]
+        Service<-->DTO[DTO]
+        Service<-->Repository[Repository]
+        Repository<-->Entities[Entities]
+    end
+
+    Repository<-->Database[(Database)]
 ```
 
 ## 🚀 Démarrage Rapide
