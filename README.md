@@ -238,7 +238,7 @@ git push origin --delete nom-branche
 
 ## 📝 Notes de Développement
 
-- Cassandra est temporairement désactivé dans `storage-service` et `analytics-service` en raison de problèmes de configuration local-datacenter. Seuls MongoDB et Redis sont actuellement actifs.
+- Cassandra est activé et configuré dans `storage-service` et `analytics-service` avec le keyspace `smartenergy` et le local-datacenter `datacenter1`.
 - Le port MongoDB a été changé à 27018 pour éviter le conflit avec l'instance MongoDB locale.
 - Le port Redis a été changé à 6380 pour éviter le conflit avec l'instance Redis locale.
 

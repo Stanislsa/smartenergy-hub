@@ -1,0 +1,14 @@
+spring.application.name=storage-service
+server.port=8082
+
+# MongoDB configuration
+spring.data.mongodb.host=localhost
+spring.data.mongodb.port=27018
+spring.data.mongodb.database=smartenergy
+
+# Redis configuration
+spring.data.redis.host=localhost
+spring.data.redis.port=6380
+
+# Cassandra configuration - disabled temporarily
+spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.cassandra.CassandraAutoConfiguration,org.springframework.boot.autoconfigure.data.cassandra.CassandraReactiveDataAutoConfiguration
