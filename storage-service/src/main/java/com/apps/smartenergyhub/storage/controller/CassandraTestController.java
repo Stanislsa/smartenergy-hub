@@ -2,6 +2,9 @@ package com.apps.smartenergyhub.storage.controller;
 
 import com.apps.smartenergyhub.storage.entity.MeasurementEntity;
 import com.apps.smartenergyhub.storage.service.CassandraMeasurementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cassandra/test")
 @RequiredArgsConstructor
+@Tag(name = "Cassandra Test", description = "Endpoints de test pour Cassandra")
 public class CassandraTestController {
 
     private final CassandraMeasurementService cassandraMeasurementService;
@@ -27,6 +31,7 @@ public class CassandraTestController {
      * POST /api/cassandra/test/write
      */
     @PostMapping("/write")
+    @Operation(summary = "Écrire une mesure de test", description = "Crée une mesure de test dans Cassandra avec des valeurs par défaut")
     public ResponseEntity<String> writeTestMeasurement() {
         try {
             String sensorId = "TEST-SENSOR-001";
@@ -53,9 +58,10 @@ public class CassandraTestController {
      * GET /api/cassandra/test/read/{sensorId}?day=2024-10-21
      */
     @GetMapping("/read/{sensorId}")
+    @Operation(summary = "Lire les mesures par jour", description = "Récupère toutes les mesures d'un capteur pour une journée spécifique")
     public ResponseEntity<List<MeasurementEntity>> readMeasurements(
-            @PathVariable String sensorId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+            @PathVariable @Parameter(description = "Identifiant du capteur") String sensorId,
+            @RequestParam(required = false) @Parameter(description = "Date de la journée (format ISO)") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
         
         LocalDate targetDay = (day != null) ? day : LocalDate.now();
         List<MeasurementEntity> measurements = 
@@ -69,9 +75,10 @@ public class CassandraTestController {
      * GET /api/cassandra/test/latest/{sensorId}?limit=10
      */
     @GetMapping("/latest/{sensorId}")
+    @Operation(summary = "Lire les dernières mesures", description = "Récupère les N dernières mesures d'un capteur pour la journée actuelle")
     public ResponseEntity<List<MeasurementEntity>> readLatestMeasurements(
-            @PathVariable String sensorId,
-            @RequestParam(defaultValue = "10") int limit) {
+            @PathVariable @Parameter(description = "Identifiant du capteur") String sensorId,
+            @RequestParam(defaultValue = "10") @Parameter(description = "Nombre maximum de résultats") int limit) {
         
         List<MeasurementEntity> measurements = 
             cassandraMeasurementService.getLatestMeasurements(sensorId, limit);
