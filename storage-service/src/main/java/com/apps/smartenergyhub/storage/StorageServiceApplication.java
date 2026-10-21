@@ -2,6 +2,7 @@ package com.apps.smartenergyhub.storage;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Application principale du service de stockage.
@@ -9,6 +10,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * dans MongoDB, Redis et Cassandra.
  */
 @SpringBootApplication
+@EnableScheduling
 public class StorageServiceApplication {
 
     /**

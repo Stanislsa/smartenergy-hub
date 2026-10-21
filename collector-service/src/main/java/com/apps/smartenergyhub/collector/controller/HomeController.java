@@ -16,7 +16,7 @@ public class HomeController {
      */
     @GetMapping("/api/health")
     public String home() {
-        return "Collector Service is running!";
+        return "Collector Service est lancé!";
     }
 
     /**

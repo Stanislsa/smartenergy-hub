@@ -1,0 +1,24 @@
+[1mdiff --git a/storage-service/pom.xml b/storage-service/pom.xml[m
+[1mindex 3eb5b8b..338643c 100644[m
+[1m--- a/storage-service/pom.xml[m
+[1m+++ b/storage-service/pom.xml[m
+[36m@@ -50,6 +50,19 @@[m
+                 <groupId>org.springframework.boot</groupId>[m
+                 <artifactId>spring-boot-maven-plugin</artifactId>[m
+             </plugin>[m
+[32m+[m[32m            <plugin>[m
+[32m+[m[32m                <groupId>org.apache.maven.plugins</groupId>[m
+[32m+[m[32m                <artifactId>maven-compiler-plugin</artifactId>[m
+[32m+[m[32m                <configuration>[m
+[32m+[m[32m                    <annotationProcessorPaths>[m
+[32m+[m[32m                        <path>[m
+[32m+[m[32m                            <groupId>org.projectlombok</groupId>[m
+[32m+[m[32m                            <artifactId>lombok</artifactId>[m
+[32m+[m[32m                            <version>${lombok.version}</version>[m
+[32m+[m[32m                        </path>[m
+[32m+[m[32m                    </annotationProcessorPaths>[m
+[32m+[m[32m                </configuration>[m
+[32m+[m[32m            </plugin>[m
+         </plugins>[m
+     </build>[m
+ [m
