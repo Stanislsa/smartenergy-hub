@@ -116,4 +116,145 @@ public class AnomalyDetector {
         all.sort(Comparator.comparing(Anomaly::timestamp).thenComparing(Anomaly::type));
         return List.copyOf(all);
     }
+
+    /**
+     * Détecte les variations brusques de puissance entre mesures consécutives.
+     * Une variation est considérée anormale si le pourcentage de variation dépasse le seuil.
+     *
+     * @param measurements mesures d'un capteur ({@code null} = aucune)
+     * @param variationThreshold seuil de variation en % (ex: 50 pour 50%)
+     * @return anomalies triées par horodatage croissant
+     */
+    public List<Anomaly> detectPowerVariations(List<MeasurementPoint> measurements, double variationThreshold) {
+        if (!Double.isFinite(variationThreshold) || variationThreshold <= 0) {
+            throw new IllegalArgumentException("variationThreshold doit être strictement positif : " + variationThreshold);
+        }
+        if (measurements == null || measurements.size() < 2) {
+            return List.of();
+        }
+
+        List<MeasurementPoint> sorted = measurements.stream()
+                .sorted(Comparator.comparing(MeasurementPoint::timestamp))
+                .toList();
+
+        List<Anomaly> anomalies = new ArrayList<>();
+        for (int i = 1; i < sorted.size(); i++) {
+            MeasurementPoint prev = sorted.get(i - 1);
+            MeasurementPoint curr = sorted.get(i);
+
+            if (prev.powerKw() == 0) {
+                continue; // Éviter division par zéro
+            }
+
+            double variation = ((curr.powerKw() - prev.powerKw()) / prev.powerKw()) * 100;
+            if (Math.abs(variation) > variationThreshold) {
+                anomalies.add(new Anomaly(
+                    curr.timestamp(),
+                    curr.powerKw(),
+                    AnomalyType.POWER_VARIATION,
+                    variation,
+                    variationThreshold,
+                    null
+                ));
+            }
+        }
+        anomalies.sort(Comparator.comparing(Anomaly::timestamp));
+        return List.copyOf(anomalies);
+    }
+
+    /**
+     * Détecte les tensions hors plage acceptable.
+     *
+     * @param measurements mesures d'un capteur ({@code null} = aucune)
+     * @param minVoltage tension minimale acceptable en V (ex: 210)
+     * @param maxVoltage tension maximale acceptable en V (ex: 250)
+     * @return anomalies triées par horodatage croissant
+     */
+    public List<Anomaly> detectVoltageAnomalies(List<MeasurementPoint> measurements, double minVoltage, double maxVoltage) {
+        if (!Double.isFinite(minVoltage) || minVoltage <= 0) {
+            throw new IllegalArgumentException("minVoltage doit être strictement positif : " + minVoltage);
+        }
+        if (!Double.isFinite(maxVoltage) || maxVoltage <= minVoltage) {
+            throw new IllegalArgumentException("maxVoltage doit être strictement supérieur à minVoltage");
+        }
+        if (measurements == null || measurements.isEmpty()) {
+            return List.of();
+        }
+
+        return measurements.stream()
+                .filter(m -> m.voltage() != null)
+                .filter(m -> m.voltage() < minVoltage || m.voltage() > maxVoltage)
+                .sorted(Comparator.comparing(MeasurementPoint::timestamp))
+                .map(m -> new Anomaly(
+                    m.timestamp(),
+                    m.powerKw(),
+                    AnomalyType.VOLTAGE,
+                    m.voltage(),
+                    maxVoltage,
+                    m.voltage()
+                ))
+                .toList();
+    }
+
+    /**
+     * Détecte les températures excessives.
+     *
+     * @param measurements mesures d'un capteur ({@code null} = aucune)
+     * @param maxTemperature température maximale acceptable en °C (ex: 80)
+     * @return anomalies triées par horodatage croissant
+     */
+    public List<Anomaly> detectTemperatureAnomalies(List<MeasurementPoint> measurements, double maxTemperature) {
+        if (!Double.isFinite(maxTemperature)) {
+            throw new IllegalArgumentException("maxTemperature doit être un nombre fini : " + maxTemperature);
+        }
+        if (measurements == null || measurements.isEmpty()) {
+            return List.of();
+        }
+
+        return measurements.stream()
+                .filter(m -> m.temperature() != null)
+                .filter(m -> m.temperature() > maxTemperature)
+                .sorted(Comparator.comparing(MeasurementPoint::timestamp))
+                .map(m -> new Anomaly(
+                    m.timestamp(),
+                    m.powerKw(),
+                    AnomalyType.TEMPERATURE,
+                    m.temperature(),
+                    maxTemperature,
+                    m.temperature()
+                ))
+                .toList();
+    }
+
+    /**
+     * Applique toutes les méthodes de détection et renvoie toutes les anomalies triées.
+     *
+     * @param measurements mesures d'un capteur
+     * @param maxPowerKw seuil de puissance max (optionnel)
+     * @param zThreshold seuil z-score
+     * @param variationThreshold seuil de variation de puissance en %
+     * @param minVoltage tension minimale acceptable
+     * @param maxVoltage tension maximale acceptable
+     * @param maxTemperature température maximale acceptable
+     * @return toutes les anomalies triées par horodatage
+     */
+    public List<Anomaly> detectAllAnomalies(
+            List<MeasurementPoint> measurements,
+            Double maxPowerKw,
+            double zThreshold,
+            double variationThreshold,
+            double minVoltage,
+            double maxVoltage,
+            double maxTemperature) {
+
+        List<Anomaly> all = new ArrayList<>();
+        all.addAll(detectByThreshold(measurements, maxPowerKw));
+        all.addAll(detectByZScore(measurements, zThreshold));
+        all.addAll(detectPowerVariations(measurements, variationThreshold));
+        all.addAll(detectVoltageAnomalies(measurements, minVoltage, maxVoltage));
+        all.addAll(detectTemperatureAnomalies(measurements, maxTemperature));
+
+        all.sort(Comparator.comparing(Anomaly::timestamp).thenComparing(Anomaly::type));
+        return List.copyOf(all);
+    }
 }

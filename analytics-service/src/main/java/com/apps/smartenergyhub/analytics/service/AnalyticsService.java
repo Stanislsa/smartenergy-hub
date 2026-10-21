@@ -75,6 +75,49 @@ public class AnalyticsService {
     }
 
     /**
+     * Détection complète des anomalies incluant variations de puissance, tension et température.
+     */
+    public AnomalyReportResponse allAnomalies(
+            String sensorId,
+            Instant from,
+            Instant to,
+            double zThreshold,
+            double variationThreshold,
+            double minVoltage,
+            double maxVoltage,
+            double maxTemperature) {
+
+        if (!Double.isFinite(zThreshold) || zThreshold <= 0) {
+            throw new InvalidAnalyticsRequestException("Le seuil z doit être strictement positif");
+        }
+        if (!Double.isFinite(variationThreshold) || variationThreshold <= 0) {
+            throw new InvalidAnalyticsRequestException("Le seuil de variation doit être strictement positif");
+        }
+        if (!Double.isFinite(minVoltage) || minVoltage <= 0) {
+            throw new InvalidAnalyticsRequestException("La tension minimale doit être strictement positive");
+        }
+        if (!Double.isFinite(maxVoltage) || maxVoltage <= minVoltage) {
+            throw new InvalidAnalyticsRequestException("La tension maximale doit être strictement supérieure à la minimale");
+        }
+
+        AnalysisPeriod period = resolvePeriod(from, to, Instant.now());
+        Double maxPowerKw = sensorThreshold(sensorId);
+        List<MeasurementPoint> points = measurementReader.findBySensorBetween(sensorId, period.from(), period.to());
+
+        List<Anomaly> anomalies = anomalyDetector.detectAllAnomalies(
+                points, maxPowerKw, zThreshold, variationThreshold, minVoltage, maxVoltage, maxTemperature);
+
+        return new AnomalyReportResponse(
+                sensorId, period.from(), period.to(),
+                points.size(),
+                maxPowerKw,
+                zThreshold,
+                anomalies.stream().filter(a -> a.type() == AnomalyType.THRESHOLD).count(),
+                anomalies.stream().filter(a -> a.type() == AnomalyType.Z_SCORE).count(),
+                anomalies.stream().map(AnomalyResponse::from).toList());
+    }
+
+    /**
      * Seuil du capteur ; lève ResourceNotFoundException (404) si le capteur est inconnu.
      * Un seuil absent ou non positif est ignoré (aucune anomalie de seuil).
      */

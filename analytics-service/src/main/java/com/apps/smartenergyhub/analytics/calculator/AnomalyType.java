@@ -9,5 +9,14 @@ public enum AnomalyType {
     THRESHOLD,
 
     /** Anomalie = |zt| &gt; seuil, avec zt = (Pt − µ) / σ. */
-    Z_SCORE
+    Z_SCORE,
+
+    /** Anomalie = variation brusque de puissance entre deux mesures consécutives. */
+    POWER_VARIATION,
+
+    /** Anomalie = tension hors plage acceptable. */
+    VOLTAGE,
+
+    /** Anomalie = température excessive. */
+    TEMPERATURE
 }

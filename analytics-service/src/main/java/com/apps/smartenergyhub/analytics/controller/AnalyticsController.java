@@ -69,6 +69,33 @@ public class AnalyticsController {
         return analyticsService.anomalies(sensorId, from, to, zThreshold);
     }
 
+    @GetMapping("/{sensorId}/anomalies/all")
+    @Operation(summary = "Détection complète des anomalies",
+            description = "Détecte les anomalies par seuil, z-score, variations de puissance, "
+                    + "tensions hors plage et températures excessives.")
+    @ApiResponse(responseCode = "200", description = "Toutes les anomalies détectées")
+    @ApiResponse(responseCode = "400", description = "Paramètres invalides")
+    @ApiResponse(responseCode = "404", description = "Capteur introuvable")
+    public AnomalyReportResponse allAnomalies(
+            @PathVariable String sensorId,
+            @Parameter(description = "Début, inclus (défaut : to − 24 h)", example = "2026-09-30T00:00:00Z")
+            @RequestParam(required = false) Instant from,
+            @Parameter(description = "Fin, exclue (défaut : maintenant)", example = "2026-10-01T00:00:00Z")
+            @RequestParam(required = false) Instant to,
+            @Parameter(description = "Seuil sur |z|", example = "3")
+            @RequestParam(name = "z", defaultValue = "3") double zThreshold,
+            @Parameter(description = "Seuil de variation de puissance en %", example = "50")
+            @RequestParam(name = "variation", defaultValue = "50") double variationThreshold,
+            @Parameter(description = "Tension minimale acceptable en V", example = "210")
+            @RequestParam(name = "minVoltage", defaultValue = "210") double minVoltage,
+            @Parameter(description = "Tension maximale acceptable en V", example = "250")
+            @RequestParam(name = "maxVoltage", defaultValue = "250") double maxVoltage,
+            @Parameter(description = "Température maximale acceptable en °C", example = "80")
+            @RequestParam(name = "maxTemperature", defaultValue = "80") double maxTemperature) {
+        return analyticsService.allAnomalies(sensorId, from, to, zThreshold, 
+                variationThreshold, minVoltage, maxVoltage, maxTemperature);
+    }
+
     /** 400 avec le même format JSON que le GlobalExceptionHandler du projet. */
     @ExceptionHandler(InvalidAnalyticsRequestException.class)
     public ResponseEntity<Map<String, Object>> invalidRequest(InvalidAnalyticsRequestException ex) {
