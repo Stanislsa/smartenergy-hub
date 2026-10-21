@@ -102,8 +102,38 @@ Les mesures sont lues via l'interface `MeasurementReader` :
 
 - **`DemoMeasurementReader`** (actif par défaut) : données simulées reproductibles, une mesure
   toutes les 5 min, cycle jour/nuit en sinus (≈ 2 kW à minuit, ≈ 5 kW à midi), bruit ± 0,2 kW,
-  **pic ×3 chaque jour à 14h00 UTC**. Sert tant que la table Cassandra (partie B) n'est pas finalisée.
-- **À venir** : `CassandraMeasurementReader`, activé par `analytics.measurement-source=cassandra`.
+  **pic ×3 chaque jour à 14h00 UTC**. Utile pour les tests et les démonstrations sans base.
+- **`CassandraMeasurementReader`** : lit les mesures réelles dans la table
+  `smartenergy.measurements_by_sensor_day` (créée par la partie B, `scripts/init-cassandra.cql`).
+
+| Source | Activation |
+|---|---|
+| Démo (défaut) | rien à faire, ou `analytics.measurement-source=demo` |
+| Cassandra | `analytics.measurement-source=cassandra` |
+
+Exemples d'activation de Cassandra sans modifier `application.properties` :
+
+```cmd
+:: au lancement Maven
+mvnw.cmd -pl analytics-service spring-boot:run -Dspring-boot.run.arguments=--analytics.measurement-source=cassandra
+:: ou par variable d'environnement (Docker Compose, CMD…)
+set ANALYTICS_MEASUREMENT_SOURCE=cassandra
+```
+
+### Lecture Cassandra
+
+La table est partitionnée par **(sensor_id, day)**, `day` étant le jour **UTC** de la mesure,
+avec `measured_at` en colonne de clustering (ordre décroissant). Pour une période [from ; to[ :
+
+1. le lecteur calcule les jours UTC couverts (ex. 19/10 22h → 21/10 02h = 3 jours) ;
+2. il envoie **une requête par partition** :
+   `SELECT * FROM measurements_by_sensor_day WHERE sensor_id = ? AND day = ? AND measured_at >= ? AND measured_at < ?` ;
+3. il regroupe les résultats (les calculs les trient ensuite par horodatage).
+
+Ce modèle d'accès respecte la clé de partition : pas de `ALLOW FILTERING`, pas de parcours
+de toute la table. La période étant limitée à 31 jours, on fait au plus 32 requêtes.
+Les lignes sans puissance ou avec une puissance invalide sont ignorées et signalées dans les logs.
+Le mapping (`MeasurementRow`, `MeasurementRowKey`) est propre à `analytics-service` et en lecture seule.
 
 Le seuil `maxPowerKw` est lu dans MongoDB via le `SensorService` existant (partie C).
 
@@ -123,6 +153,7 @@ est une mesure valide mais inhabituelle : elle est conservée et signalée.
 | `AnomalyDetectorTest` | seuil strict, Pmax absent/invalide, tri, pic ×3 détecté, chute détectée, σ = 0, trop peu de mesures, limite n < 11, seuil z invalide, combinaison des deux méthodes |
 | `MeasurementPointTest` | mesure valide, horodatage obligatoire, puissance négative ou NaN refusée |
 | `DemoMeasurementReaderTest` | 288 mesures / 24 h, début non aligné, pic de 14h00, reproductibilité |
+| `CassandraMeasurementReaderTest` | une journée = une partition, période sur 3 jours = 3 requêtes, `to` à minuit exclu, lignes invalides ignorées, période vide |
 | `AnalyticsServiceTest` | résumé et anomalies sur 24 h, capteur sans seuil, capteur inconnu, période invalide, z invalide, période par défaut, période > 31 jours |
 | `AnalyticsControllerTest` | 200 summary/anomalies, paramètres par défaut, 404 capteur inconnu, 400 période invalide, 400 date mal formée |
 
