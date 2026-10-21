@@ -18,6 +18,8 @@ Tous les champs sont stockés dans Redis sous forme de **texte**.
   "timestamp": "2026-09-30T08:15:00Z",
   "powerKw": 3.72,
   "voltage": 226.4,
+  "current": 16.4,
+  "frequency": 50.0,
   "temperature": 29.1
 }
 ```
@@ -53,4 +55,4 @@ Exemple de réponse 400 :
 
 `sensorId`, `timestamp`, `powerKw`, `voltage`, `temperature`
 
-(Si `temperature` est absente, la valeur est `null` en texte.)
+(Les champs facultatifs absents ne sont pas écrits dans l’événement Redis (B doit prévoir qu’ils peuvent manquer).)
