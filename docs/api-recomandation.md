@@ -56,7 +56,7 @@ Le CassandraMeasurementService n'a pas besoin d'un port HTTP propre : il s'agit 
 | Redis | 6380 côté hôte | TCP/Redis | Transporte les événements via Streams |
 | Storage-service | 8082 | HTTP entrant, si ses endpoints sont activés | Expose les endpoints de test et exécute le consommateur Redis |
 | Cassandra | 9042 par défaut | TCP/CQL | Stocke et interroge les mesures |
-| MongoDB | 27017 par défaut | TCP/MongoDB | Métadonnées ou agrégats, selon l'architecture du projet |
+| MongoDB | 27018 côté hôte | TCP/MongoDB | Métadonnées ou agrégats, selon l'architecture du projet |
 
 Le port CQL par défaut de Cassandra est 9042. Les ports MongoDB et Redis doivent être confirmés dans la configuration réellement utilisée.
 
@@ -201,7 +201,7 @@ Depuis le terminal Linux ou WSL où les services tournent :
 
 ```bash
 echo "=== PORTS APPLICATIONS ET BASES ==="
-sudo ss -ltnp | grep -E ':(8081|8082|8083|8084|6380|6379|9042|27017)\b' || true
+sudo ss -ltnp | grep -E ':(8081|8082|8083|8084|6380|6379|9042|27018)\b' || true
 ```
 
 Puis tester les connexions :
@@ -214,7 +214,7 @@ echo "=== CASSANDRA ==="
 cqlsh localhost 9042 -e "DESCRIBE KEYSPACE smartenergy"
 
 echo "=== MONGODB ==="
-mongosh "mongodb://localhost:27017" --quiet \
+mongosh "mongodb://localhost:27018" --quiet \
   --eval 'db.runCommand({ ping: 1 })'
 ```
 
