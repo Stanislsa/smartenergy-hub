@@ -61,6 +61,52 @@ déclencher d'alertes sur les variations normales (sinus du simulateur).
 - un pic très fort augmente lui-même µ et σ, ce qui peut masquer d'autres pics ;
 - une dérive lente de la consommation n'est pas détectée.
 
+## API REST (Étape 9)
+
+Service `analytics-service`, port **8083**. Documentation Swagger : `http://localhost:8083/swagger-ui.html`.
+Dates en ISO 8601 UTC (`2026-09-30T00:00:00Z`). Période analysée : [from ; to[.
+Par défaut : `to` = maintenant, `from` = `to` − 24 h. Période maximale : 31 jours.
+
+| Endpoint | Rôle |
+|---|---|
+| `GET /api/analytics/{sensorId}/summary?from=&to=` | Niveau A : moyenne, min, max, nombre de mesures, énergie, dépassements du `maxPowerKw` |
+| `GET /api/analytics/{sensorId}/anomalies?from=&to=&z=3` | Niveau B : anomalies par seuil et par z-score |
+
+| Cas | Code |
+|---|---|
+| Requête valide | 200 |
+| `from` ≥ `to`, période > 31 jours, `z` ≤ 0, date mal formée | 400 |
+| Capteur absent de MongoDB | 404 |
+
+Exemple — `GET /api/analytics/SENSOR-001/summary?from=2026-09-30T00:00:00Z&to=2026-10-01T00:00:00Z`
+(source de démonstration) :
+
+```json
+{
+  "sensorId": "SENSOR-001",
+  "from": "2026-09-30T00:00:00Z",
+  "to": "2026-10-01T00:00:00Z",
+  "measurementCount": 288,
+  "avgPowerKw": 3.534,
+  "minPowerKw": 1.857,
+  "maxPowerKw": 13.94,
+  "energyKwh": 84.647,
+  "maxPowerThresholdKw": 8.0,
+  "thresholdExceedances": 1
+}
+```
+
+### Source des mesures
+
+Les mesures sont lues via l'interface `MeasurementReader` :
+
+- **`DemoMeasurementReader`** (actif par défaut) : données simulées reproductibles, une mesure
+  toutes les 5 min, cycle jour/nuit en sinus (≈ 2 kW à minuit, ≈ 5 kW à midi), bruit ± 0,2 kW,
+  **pic ×3 chaque jour à 14h00 UTC**. Sert tant que la table Cassandra (partie B) n'est pas finalisée.
+- **À venir** : `CassandraMeasurementReader`, activé par `analytics.measurement-source=cassandra`.
+
+Le seuil `maxPowerKw` est lu dans MongoDB via le `SensorService` existant (partie C).
+
 ## Format erreur vs anomalie
 
 Une **erreur de format** (puissance négative, horodatage absent) est rejetée dès la création
@@ -69,12 +115,15 @@ est une mesure valide mais inhabituelle : elle est conservée et signalée.
 
 ## Tests unitaires
 
-`analytics-service/src/test/java/com/apps/smartenergyhub/analytics/` — 24 tests :
+`analytics-service/src/test/java/com/apps/smartenergyhub/analytics/` :
 
 | Classe | Cas couverts |
 |---|---|
 | `EnergyCalculatorTest` | liste vide/null, une mesure, moyenne/min/max, énergie (intervalles réguliers et irréguliers), ordre d'entrée, dépassements stricts, absence de seuil, seuil invalide |
 | `AnomalyDetectorTest` | seuil strict, Pmax absent/invalide, tri, pic ×3 détecté, chute détectée, σ = 0, trop peu de mesures, limite n < 11, seuil z invalide, combinaison des deux méthodes |
 | `MeasurementPointTest` | mesure valide, horodatage obligatoire, puissance négative ou NaN refusée |
+| `DemoMeasurementReaderTest` | 288 mesures / 24 h, début non aligné, pic de 14h00, reproductibilité |
+| `AnalyticsServiceTest` | résumé et anomalies sur 24 h, capteur sans seuil, capteur inconnu, période invalide, z invalide, période par défaut, période > 31 jours |
+| `AnalyticsControllerTest` | 200 summary/anomalies, paramètres par défaut, 404 capteur inconnu, 400 période invalide, 400 date mal formée |
 
 Lancement : `./mvnw -pl analytics-service test` (Windows : `mvnw.cmd -pl analytics-service test`).
