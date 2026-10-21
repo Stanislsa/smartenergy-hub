@@ -14,7 +14,7 @@ public class HomeController {
      * Endpoint racine pour vérifier que le service fonctionne.
      * @return Message de confirmation
      */
-    @GetMapping("/")
+    @GetMapping("/api/health")
     public String home() {
         return "Collector Service is running!";
     }
