@@ -26,7 +26,7 @@ import java.util.List;
  * <p><b>Limites de la méthode z-score</b> (à reprendre dans le rapport) :</p>
  * <ul>
  *   <li>Si σ = 0 (puissance constante), z n'est pas défini : aucune anomalie n'est signalée.</li>
- *   <li>Avec n mesures, |z| ne peut pas dépasser (n − 1) / √n. Avec le seuil 3, il faut
+ *   <li>Avec n mesures, |z| ne peut pas dépasser √(n − 1) (écart-type de population). Avec le seuil 3, il faut
  *       donc au moins 11 mesures pour qu'une anomalie soit détectable.</li>
  *   <li>Un pic très fort augmente lui-même µ et σ, ce qui « masque » partiellement les autres pics.</li>
  *   <li>La méthode suppose une consommation à peu près stable sur la période ; elle détecte mal

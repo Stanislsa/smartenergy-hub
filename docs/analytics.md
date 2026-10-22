@@ -101,24 +101,24 @@ Exemple — `GET /api/analytics/SENSOR-001/summary?from=2026-09-30T00:00:00Z&to=
 
 Les mesures sont lues via l'interface `MeasurementReader` :
 
-- **`DemoMeasurementReader`** (actif par défaut) : données simulées reproductibles, une mesure
+- **`DemoMeasurementReader`** (profil `mongo-only` et tests) : données simulées reproductibles, une mesure
   toutes les 5 min, cycle jour/nuit en sinus (≈ 2 kW à minuit, ≈ 5 kW à midi), bruit ± 0,2 kW,
   **pic ×3 chaque jour à 14h00 UTC**. Utile pour les tests et les démonstrations sans base.
-- **`CassandraMeasurementReader`** : lit les mesures réelles dans la table
+- **`CassandraMeasurementReader`** (**par défaut**) : lit les mesures réelles dans la table
   `smartenergy.measurements_by_sensor_day` (créée par la partie B, `scripts/init-cassandra.cql`).
 
 | Source | Activation |
 |---|---|
-| Démo (défaut) | rien à faire, ou `analytics.measurement-source=demo` |
-| Cassandra | `analytics.measurement-source=cassandra` |
+| Cassandra (défaut) | `analytics.measurement-source=cassandra` dans `application.properties` |
+| Démo | profil `mongo-only` (automatique), ou `analytics.measurement-source=demo` |
 
-Exemples d'activation de Cassandra sans modifier `application.properties` :
+Pour forcer la démo sans modifier `application.properties` :
 
 ```cmd
 :: au lancement Maven
-mvnw.cmd -pl analytics-service spring-boot:run -Dspring-boot.run.arguments=--analytics.measurement-source=cassandra
+mvnw.cmd -pl analytics-service spring-boot:run -Dspring-boot.run.arguments=--analytics.measurement-source=demo
 :: ou par variable d'environnement (Docker Compose, CMD…)
-set ANALYTICS_MEASUREMENT_SOURCE=cassandra
+set ANALYTICS_MEASUREMENT_SOURCE=demo
 ```
 
 ### Lecture Cassandra
