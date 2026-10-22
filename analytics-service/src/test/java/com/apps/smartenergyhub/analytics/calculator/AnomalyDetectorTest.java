@@ -119,7 +119,7 @@ class AnomalyDetectorTest {
     @Test
     @DisplayName("z-score : limite documentée, avec moins de 11 mesures |z| ne peut pas dépasser 3")
     void zScoreSmallSampleLimit() {
-        // 9 mesures normales + 1 pic énorme = 10 mesures : |z| max = 9/√10 ≈ 2,85
+        // 9 mesures normales + 1 pic énorme = 10 mesures : |z| max = √9 = 3, jamais strictement > 3
         List<MeasurementPoint> points = new ArrayList<>(Collections.nCopies(9, at(0, 3.0)));
         points.add(at(1, 1000.0));
 
