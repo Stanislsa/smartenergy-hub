@@ -8,6 +8,9 @@ import numpy as np
 from datetime import datetime, timedelta
 import os
 
+# Graine pour la reproductibilité
+np.random.seed(42)
+
 
 def generate_synthetic_measurements(
     output_path: str = "data/raw/forecast_dataset.csv",
@@ -29,7 +32,7 @@ def generate_synthetic_measurements(
     
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    all_data = []
+    all_data = []SENSOR-
     
     for sensor_id in range(1, num_sensors + 1):
         sensor_name = f"sensor_{sensor_id:03d}"
