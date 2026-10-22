@@ -14,6 +14,7 @@ import joblib
 import os
 import json
 from datetime import datetime
+from app.preprocessing.features import to_hourly
 
 
 class LSTMForecastTrainer:
@@ -30,9 +31,15 @@ class LSTMForecastTrainer:
             raise FileNotFoundError(f"Dataset non trouvé: {self.data_path}")
         
         df = pd.read_csv(self.data_path)
-        df['measured_at'] = pd.to_datetime(df['measured_at'])
+        df['measured_at'] = pd.to_datetime(df['measured_at'], utc=True)
         print(f"Dataset chargé: {len(df)} lignes")
-        return df
+        
+        # Regrouper par heure avant de créer les séquences
+        measurements = df.to_dict('records')
+        df_hourly = to_hourly(measurements)
+        print(f"Données horaires: {len(df_hourly)} lignes")
+        
+        return df_hourly.reset_index()
     
     def create_temporal_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Crée des features temporelles pour LSTM"""

@@ -1,5 +1,6 @@
 from app.core.config import get_settings
 from app.services.cassandra_service import CassandraService
+from app.preprocessing.features import to_hourly
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import joblib
@@ -43,49 +44,48 @@ class ForecastService:
         
         Returns:
             Features pour la prévision
+        
+        Raises:
+            ValueError: Si données insuffisantes
         """
-        try:
-            measurements = self.cassandra.get_latest_measurements(sensor_id, hours)
-            
-            if not measurements or len(measurements) < 24:
-                logger.warning(f"Données insuffisantes pour {sensor_id}, utilisation features par défaut")
-                return self._get_default_features()
-            
-            # Calculer les lags
-            power_values = [m["power_kw"] for m in measurements[:24]]
-            voltage = measurements[0].get("voltage", 230.0) if measurements else 230.0
-            temperature = measurements[0].get("temperature", 35.0) if measurements else 35.0
-            
-            # Features temporelles
-            latest_timestamp = measurements[0]["measured_at"]
-            hour = latest_timestamp.hour
-            day_of_week = latest_timestamp.weekday()
-            is_weekend = 1 if day_of_week >= 5 else 0
-            month = latest_timestamp.month
-            
-            # Lags
-            lags = []
-            for lag in [1, 2, 3, 6, 12, 24]:
-                if lag < len(power_values):
-                    lags.append(power_values[lag])
-                else:
-                    lags.append(power_values[0])
-            
-            features = np.array([[
-                lags[0], lags[1], lags[2], lags[3], lags[4], lags[5],
-                hour, day_of_week, is_weekend, month,
-                voltage, temperature
-            ]])
-            
-            return features
-            
-        except Exception as e:
-            logger.error(f"Erreur récupération features Cassandra: {e}")
-            return self._get_default_features()
-    
-    def _get_default_features(self) -> np.ndarray:
-        """Retourne des features par défaut si Cassandra indisponible"""
-        return np.array([[5.0, 4.8, 5.2, 4.5, 5.0, 4.9, 14, 2, 0, 10, 230, 35]])
+        measurements = self.cassandra.get_latest_measurements(sensor_id, hours)
+        
+        if not measurements or len(measurements) < 24:
+            raise ValueError(f"Données insuffisantes pour {sensor_id} ({len(measurements)} h)")
+        
+        # Regrouper par heure avant de créer les lags
+        df_hourly = to_hourly(measurements)
+        
+        if len(df_hourly) < 24:
+            raise ValueError(f"Données horaires insuffisantes pour {sensor_id} ({len(df_hourly)} h)")
+        
+        # Calculer les lags sur les données horaires
+        power_values = df_hourly['power_kw'].tolist()
+        voltage = df_hourly['voltage'].iloc[-1] if 'voltage' in df_hourly.columns else 230.0
+        temperature = df_hourly['temperature'].iloc[-1] if 'temperature' in df_hourly.columns else 35.0
+        
+        # Features temporelles
+        latest_timestamp = df_hourly.index[-1]
+        hour = latest_timestamp.hour
+        day_of_week = latest_timestamp.weekday()
+        is_weekend = 1 if day_of_week >= 5 else 0
+        month = latest_timestamp.month
+        
+        # Lags
+        lags = []
+        for lag in [1, 2, 3, 6, 12, 24]:
+            if lag < len(power_values):
+                lags.append(power_values[-lag])
+            else:
+                lags.append(power_values[0])
+        
+        features = np.array([[
+            lags[0], lags[1], lags[2], lags[3], lags[4], lags[5],
+            hour, day_of_week, is_weekend, month,
+            voltage, temperature
+        ]])
+        
+        return features
     
     def predict(self, features: np.ndarray, horizon_minutes: int = 60) -> Dict:
         """

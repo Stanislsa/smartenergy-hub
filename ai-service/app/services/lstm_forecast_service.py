@@ -1,11 +1,18 @@
 from app.core.config import get_settings
-from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
 import joblib
 import numpy as np
 import os
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
+
+# TensorFlow est optionnel
+try:
+    from tensorflow.keras.models import load_model
+    TENSORFLOW_AVAILABLE = True
+except ImportError:
+    TENSORFLOW_AVAILABLE = False
+    load_model = None
 
 
 class LSTMForecastService:
@@ -20,6 +27,9 @@ class LSTMForecastService:
     
     def load_model(self):
         """Charge le modèle LSTM et le scaler depuis les fichiers."""
+        if not TENSORFLOW_AVAILABLE:
+            raise RuntimeError("TensorFlow n'est pas installé. Installez requirements-lstm.txt pour utiliser le LSTM.")
+        
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Modèle LSTM non trouvé: {self.model_path}")
         
