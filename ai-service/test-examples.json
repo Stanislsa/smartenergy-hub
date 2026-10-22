@@ -1,0 +1,155 @@
+{
+  "examples": [
+    {
+      "name": "Mesure Normale",
+      "description": "Consommation standard dans les plages acceptables",
+      "data": {
+        "sensor_id": "SENSOR-001",
+        "timestamp": "2026-10-22T08:00:00Z",
+        "power_kw": 3.5,
+        "voltage": 230.0,
+        "temperature": 35.0
+      },
+      "expected": {
+        "is_anomaly": false,
+        "severity": "NORMAL"
+      }
+    },
+    {
+      "name": "Anomalie - Puissance Excessive",
+      "description": "Puissance au-dessus du seuil de 10kW",
+      "data": {
+        "sensor_id": "SENSOR-002",
+        "timestamp": "2026-10-22T14:00:00Z",
+        "power_kw": 15.0,
+        "voltage": 230.0,
+        "temperature": 35.0
+      },
+      "expected": {
+        "is_anomaly": true,
+        "severity": "HIGH",
+        "reason": "Puissance excessive"
+      }
+    },
+    {
+      "name": "Anomalie - Tension Basse",
+      "description": "Tension en-dessous de 210V",
+      "data": {
+        "sensor_id": "SENSOR-003",
+        "timestamp": "2026-10-22T10:00:00Z",
+        "power_kw": 3.5,
+        "voltage": 200.0,
+        "temperature": 35.0
+      },
+      "expected": {
+        "is_anomaly": true,
+        "severity": "MEDIUM",
+        "reason": "Tension hors plage"
+      }
+    },
+    {
+      "name": "Anomalie - Tension Haute",
+      "description": "Tension au-dessus de 250V",
+      "data": {
+        "sensor_id": "SENSOR-004",
+        "timestamp": "2026-10-22T12:00:00Z",
+        "power_kw": 3.5,
+        "voltage": 260.0,
+        "temperature": 35.0
+      },
+      "expected": {
+        "is_anomaly": true,
+        "severity": "MEDIUM",
+        "reason": "Tension hors plage"
+      }
+    },
+    {
+      "name": "Anomalie - Température Excessive",
+      "description": "Température au-dessus de 80°C",
+      "data": {
+        "sensor_id": "SENSOR-005",
+        "timestamp": "2026-10-22T15:00:00Z",
+        "power_kw": 3.5,
+        "voltage": 230.0,
+        "temperature": 85.0
+      },
+      "expected": {
+        "is_anomaly": true,
+        "severity": "HIGH",
+        "reason": "Température excessive"
+      }
+    },
+    {
+      "name": "Anomalie - Multiple",
+      "description": "Plusieurs anomalies simultanées",
+      "data": {
+        "sensor_id": "SENSOR-006",
+        "timestamp": "2026-10-22T16:00:00Z",
+        "power_kw": 12.0,
+        "voltage": 205.0,
+        "temperature": 82.0
+      },
+      "expected": {
+        "is_anomaly": true,
+        "severity": "HIGH",
+        "reasons": ["Puissance excessive", "Tension hors plage", "Température excessive"]
+      }
+    },
+    {
+      "name": "Mesure sans Tension",
+      "description": "Mesure avec seulement puissance et température",
+      "data": {
+        "sensor_id": "SENSOR-007",
+        "timestamp": "2026-10-22T09:00:00Z",
+        "power_kw": 4.0,
+        "temperature": 40.0
+      },
+      "expected": {
+        "is_anomaly": false,
+        "severity": "NORMAL"
+      }
+    },
+    {
+      "name": "Mesure sans Température",
+      "description": "Mesure avec seulement puissance et tension",
+      "data": {
+        "sensor_id": "SENSOR-008",
+        "timestamp": "2026-10-22T11:00:00Z",
+        "power_kw": 5.0,
+        "voltage": 235.0
+      },
+      "expected": {
+        "is_anomaly": false,
+        "severity": "NORMAL"
+      }
+    },
+    {
+      "name": "Mesure Minimale",
+      "description": "Seulement les champs obligatoires",
+      "data": {
+        "sensor_id": "SENSOR-009",
+        "timestamp": "2026-10-22T07:00:00Z",
+        "power_kw": 2.0
+      },
+      "expected": {
+        "is_anomaly": false,
+        "severity": "NORMAL"
+      }
+    },
+    {
+      "name": "Limite - Puissance Juste au Seuil",
+      "description": "Puissance exactement à 10kW (limite)",
+      "data": {
+        "sensor_id": "SENSOR-010",
+        "timestamp": "2026-10-22T13:00:00Z",
+        "power_kw": 10.0,
+        "voltage": 230.0,
+        "temperature": 35.0
+      },
+      "expected": {
+        "is_anomaly": false,
+        "severity": "NORMAL"
+      }
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Service - Interface de Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            font-family: monospace;
+            height: 150px;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            border-left: 4px solid #28a745;
+        }
+        .error {
+            border-left: 4px solid #dc3545;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Service - Interface de Test</h1>
+        
+        <div class="section">
+            <h2>Configuration</h2>
+            <label>URL du service :</label>
+            <input type="text" id="baseUrl" value="http://localhost:8085" placeholder="http://localhost:8085">
+        </div>
+
+        <div class="section">
+            <h2>1. Health Check</h2>
+            <button onclick="testHealth()">Tester Health</button>
+            <div id="healthResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. Détection d'Anomalie</h2>
+            <label>JSON de la mesure :</label>
+            <textarea id="anomalyInput">{
+  "sensor_id": "SENSOR-001",
+  "timestamp": "2026-10-22T08:00:00Z",
+  "power_kw": 15.0,
+  "voltage": 200.0,
+  "temperature": 85.0
+}</textarea>
+            <button onclick="testAnomaly()">Tester Anomalie</button>
+            <div id="anomalyResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. Mesure Normale (Test)</h2>
+            <button onclick="testNormal()">Tester Mesure Normale</button>
+            <div id="normalResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = () => document.getElementById('baseUrl').value;
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.innerHTML = 'Chargement...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/health`);
+                const data = await response.json();
+                resultDiv.innerHTML = JSON.stringify(data, null, 2);
+                resultDiv.classList.add('success');
+            } catch (error) {
+                resultDiv.innerHTML = `Erreur: ${error.message}`;
+                resultDiv.classList.add('error');
+            }
+        }
+
+        async function testAnomaly() {
+            const resultDiv = document.getElementById('anomalyResult');
+            const input = document.getElementById('anomalyInput').value;
+            resultDiv.innerHTML = 'Chargement...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(`${baseUrl()}/api/v1/anomalies/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: input
+                });
+                const data = await response.json();
+                resultDiv.innerHTML = JSON.stringify(data, null, 2);
+                resultDiv.classList.add(data.is_anomaly ? 'error' : 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `Erreur: ${error.message}`;
+                resultDiv.classList.add('error');
+            }
+        }
+
+        async function testNormal() {
+            const resultDiv = document.getElementById('normalResult');
+            resultDiv.innerHTML = 'Chargement...';
+            resultDiv.className = 'result';
+            
+            const normalData = {
+                sensor_id: "SENSOR-002",
+                timestamp: "2026-10-22T08:00:00Z",
+                power_kw: 3.5,
+                voltage: 230.0,
+                temperature: 35.0
+            };
+            
+            try {
+                const response = await fetch(`${baseUrl()}/api/v1/anomalies/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(normalData)
+                });
+                const data = await response.json();
+                resultDiv.innerHTML = JSON.stringify(data, null, 2);
+                resultDiv.classList.add(data.is_anomaly ? 'error' : 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `Erreur: ${error.message}`;
+                resultDiv.classList.add('error');
+            }
+        }
+    </script>
+</body>
+</html>
