@@ -1,12 +1,46 @@
-target/
+# IDE
 .idea/
 .vscode/
 *.iml
-.env
-__pycache__/
-*.csv
+
+# Build
+target/
 .mvn/
-mvnw
-mvnw.cmd
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# Data
+*.csv
+*.parquet
+*.jsonl
+
+# Logs
 *.log
+logs/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# AI Service
+ai-service/artifacts/
+ai-service/notebooks/
+ai-service/data/raw/
+ai-service/data/processed/
+
+# Maven wrapper (commented to keep in repo)
+# mvnw
+# mvnw.cmd
