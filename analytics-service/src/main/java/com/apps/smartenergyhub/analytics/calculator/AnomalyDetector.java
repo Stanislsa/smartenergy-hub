@@ -117,17 +117,41 @@ public class AnomalyDetector {
         return List.copyOf(all);
     }
 
+    /** Écart absolu minimal (kW) pour qu'une variation de puissance soit signalée. */
+    public static final double DEFAULT_MIN_VARIATION_KW = 1.0;
+
     /**
-     * Détecte les variations brusques de puissance entre mesures consécutives.
-     * Une variation est considérée anormale si le pourcentage de variation dépasse le seuil.
-     *
-     * @param measurements mesures d'un capteur ({@code null} = aucune)
-     * @param variationThreshold seuil de variation en % (ex: 50 pour 50%)
-     * @return anomalies triées par horodatage croissant
+     * Variations brusques de puissance entre deux mesures consécutives.
+     * Utilise l'écart minimal par défaut ({@value #DEFAULT_MIN_VARIATION_KW} kW).
      */
     public List<Anomaly> detectPowerVariations(List<MeasurementPoint> measurements, double variationThreshold) {
+        return detectPowerVariations(measurements, variationThreshold, DEFAULT_MIN_VARIATION_KW);
+    }
+
+    /**
+     * Variations brusques de puissance entre deux mesures consécutives.
+     *
+     * <p>Une variation est signalée si, à la fois :</p>
+     * <ul>
+     *   <li>|ΔP / P(t-1)| × 100 &gt; {@code variationThreshold} (%) ;</li>
+     *   <li>|ΔP| ≥ {@code minDeltaKw} : évite les fausses alertes sur de très petites
+     *       puissances (0,1 → 0,2 kW = +100 % mais négligeable) ;</li>
+     *   <li>ce n'est pas le <b>retour à la normale</b> juste après une variation déjà signalée
+     *       dans l'autre sens (sinon un seul pic produirait deux anomalies).</li>
+     * </ul>
+     *
+     * @param measurements       mesures d'un capteur ({@code null} = aucune)
+     * @param variationThreshold seuil de variation en % (ex. 50)
+     * @param minDeltaKw         écart absolu minimal en kW (≥ 0)
+     * @return anomalies triées par horodatage croissant ; score = variation en %
+     */
+    public List<Anomaly> detectPowerVariations(List<MeasurementPoint> measurements,
+                                               double variationThreshold, double minDeltaKw) {
         if (!Double.isFinite(variationThreshold) || variationThreshold <= 0) {
             throw new IllegalArgumentException("variationThreshold doit être strictement positif : " + variationThreshold);
+        }
+        if (!Double.isFinite(minDeltaKw) || minDeltaKw < 0) {
+            throw new IllegalArgumentException("minDeltaKw doit être positif ou nul : " + minDeltaKw);
         }
         if (measurements == null || measurements.size() < 2) {
             return List.of();
@@ -138,37 +162,37 @@ public class AnomalyDetector {
                 .toList();
 
         List<Anomaly> anomalies = new ArrayList<>();
+        int lastFlagged = -2;
+        double lastFlaggedSign = 0;
         for (int i = 1; i < sorted.size(); i++) {
-            MeasurementPoint prev = sorted.get(i - 1);
-            MeasurementPoint curr = sorted.get(i);
-
-            if (prev.powerKw() == 0) {
-                continue; // Éviter division par zéro
+            double previous = sorted.get(i - 1).powerKw();
+            MeasurementPoint current = sorted.get(i);
+            if (previous == 0) {
+                continue; // variation relative non définie
             }
-
-            double variation = ((curr.powerKw() - prev.powerKw()) / prev.powerKw()) * 100;
-            if (Math.abs(variation) > variationThreshold) {
-                anomalies.add(new Anomaly(
-                    curr.timestamp(),
-                    curr.powerKw(),
-                    AnomalyType.POWER_VARIATION,
-                    variation,
-                    variationThreshold,
-                    null
-                ));
+            double delta = current.powerKw() - previous;
+            double variationPct = delta / previous * 100;
+            if (Math.abs(variationPct) <= variationThreshold || Math.abs(delta) < minDeltaKw) {
+                continue;
             }
+            boolean returnToNormal = lastFlagged == i - 1 && Math.signum(delta) == -lastFlaggedSign;
+            if (returnToNormal) {
+                continue;
+            }
+            anomalies.add(new Anomaly(current.timestamp(), current.powerKw(),
+                    AnomalyType.POWER_VARIATION, variationPct, variationThreshold, null));
+            lastFlagged = i;
+            lastFlaggedSign = Math.signum(delta);
         }
-        anomalies.sort(Comparator.comparing(Anomaly::timestamp));
         return List.copyOf(anomalies);
     }
 
     /**
-     * Détecte les tensions hors plage acceptable.
+     * Tensions hors de la plage [minVoltage ; maxVoltage].
+     * Les mesures sans tension sont ignorées.
      *
-     * @param measurements mesures d'un capteur ({@code null} = aucune)
-     * @param minVoltage tension minimale acceptable en V (ex: 210)
-     * @param maxVoltage tension maximale acceptable en V (ex: 250)
-     * @return anomalies triées par horodatage croissant
+     * @return anomalies triées ; score = tension mesurée ; limit = la borne dépassée
+     *         (minVoltage si trop basse, maxVoltage si trop haute) ; value = tension
      */
     public List<Anomaly> detectVoltageAnomalies(List<MeasurementPoint> measurements, double minVoltage, double maxVoltage) {
         if (!Double.isFinite(minVoltage) || minVoltage <= 0) {
@@ -185,23 +209,16 @@ public class AnomalyDetector {
                 .filter(m -> m.voltage() != null)
                 .filter(m -> m.voltage() < minVoltage || m.voltage() > maxVoltage)
                 .sorted(Comparator.comparing(MeasurementPoint::timestamp))
-                .map(m -> new Anomaly(
-                    m.timestamp(),
-                    m.powerKw(),
-                    AnomalyType.VOLTAGE,
-                    m.voltage(),
-                    maxVoltage,
-                    m.voltage()
-                ))
+                .map(m -> new Anomaly(m.timestamp(), m.powerKw(), AnomalyType.VOLTAGE,
+                        m.voltage(), m.voltage() < minVoltage ? minVoltage : maxVoltage, m.voltage()))
                 .toList();
     }
 
     /**
-     * Détecte les températures excessives.
+     * Températures strictement supérieures à {@code maxTemperature}.
+     * Les mesures sans température sont ignorées.
      *
-     * @param measurements mesures d'un capteur ({@code null} = aucune)
-     * @param maxTemperature température maximale acceptable en °C (ex: 80)
-     * @return anomalies triées par horodatage croissant
+     * @return anomalies triées ; score = value = température ; limit = maxTemperature
      */
     public List<Anomaly> detectTemperatureAnomalies(List<MeasurementPoint> measurements, double maxTemperature) {
         if (!Double.isFinite(maxTemperature)) {
@@ -215,28 +232,14 @@ public class AnomalyDetector {
                 .filter(m -> m.temperature() != null)
                 .filter(m -> m.temperature() > maxTemperature)
                 .sorted(Comparator.comparing(MeasurementPoint::timestamp))
-                .map(m -> new Anomaly(
-                    m.timestamp(),
-                    m.powerKw(),
-                    AnomalyType.TEMPERATURE,
-                    m.temperature(),
-                    maxTemperature,
-                    m.temperature()
-                ))
+                .map(m -> new Anomaly(m.timestamp(), m.powerKw(), AnomalyType.TEMPERATURE,
+                        m.temperature(), maxTemperature, m.temperature()))
                 .toList();
     }
 
     /**
-     * Applique toutes les méthodes de détection et renvoie toutes les anomalies triées.
-     *
-     * @param measurements mesures d'un capteur
-     * @param maxPowerKw seuil de puissance max (optionnel)
-     * @param zThreshold seuil z-score
-     * @param variationThreshold seuil de variation de puissance en %
-     * @param minVoltage tension minimale acceptable
-     * @param maxVoltage tension maximale acceptable
-     * @param maxTemperature température maximale acceptable
-     * @return toutes les anomalies triées par horodatage
+     * Applique les cinq méthodes (seuil, z-score, variation, tension, température)
+     * et renvoie toutes les anomalies triées par horodatage puis par type.
      */
     public List<Anomaly> detectAllAnomalies(
             List<MeasurementPoint> measurements,

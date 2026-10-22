@@ -70,7 +70,8 @@ class AnalyticsControllerTest {
     void anomaliesOk() throws Exception {
         Instant spike = Instant.parse("2026-09-30T14:00:00Z");
         when(analyticsService.anomalies(eq("SENSOR-001"), eq(FROM), eq(TO), eq(2.5))).thenReturn(
-                new AnomalyReportResponse("SENSOR-001", FROM, TO, 288, 8.0, 2.5, 1, 1, List.of(
+                AnomalyReportResponse.of("SENSOR-001", FROM, TO, 288, 8.0, 2.5,
+                        List.of(AnomalyType.THRESHOLD, AnomalyType.Z_SCORE), List.of(
                         new AnomalyResponse(spike, 14.4, AnomalyType.THRESHOLD, 1.8, 8.0),
                         new AnomalyResponse(spike, 14.4, AnomalyType.Z_SCORE, 9.1, 2.5))));
 
@@ -84,6 +85,24 @@ class AnalyticsControllerTest {
                 .andExpect(jsonPath("$.anomalies[1].method").value("Z_SCORE"));
 
         verify(analyticsService).anomalies("SENSOR-001", FROM, TO, 2.5);
+    }
+
+    @Test
+    @DisplayName("GET /anomalies/all → 200, paramètres par défaut transmis, décompte par méthode")
+    void allAnomaliesOk() throws Exception {
+        Instant spike = Instant.parse("2026-09-30T14:00:00Z");
+        when(analyticsService.allAnomalies("SENSOR-001", FROM, TO, 3.0, 50.0, 210.0, 250.0, 80.0)).thenReturn(
+                AnomalyReportResponse.of("SENSOR-001", FROM, TO, 288, 8.0, 3.0, List.of(AnomalyType.values()), List.of(
+                        new AnomalyResponse(spike, 14.4, AnomalyType.VOLTAGE, 205.0, 210.0, 205.0))));
+
+        mockMvc.perform(get("/api/analytics/SENSOR-001/anomalies/all")
+                        .param("from", "2026-09-30T00:00:00Z")
+                        .param("to", "2026-10-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.anomalyCountByMethod.VOLTAGE").value(1))
+                .andExpect(jsonPath("$.anomalyCountByMethod.TEMPERATURE").value(0))
+                .andExpect(jsonPath("$.anomalies[0].limit").value(210.0))
+                .andExpect(jsonPath("$.anomalies[0].value").value(205.0));
     }
 
     @Test

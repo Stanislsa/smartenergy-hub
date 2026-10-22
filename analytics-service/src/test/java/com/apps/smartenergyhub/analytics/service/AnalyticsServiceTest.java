@@ -86,6 +86,39 @@ class AnalyticsServiceTest {
     }
 
     @Test
+    @DisplayName("anomalies/all sur 24 h de démo : pic de 14h00 signalé une fois par seuil, z-score et variation")
+    void allAnomaliesOnOneDay() {
+        when(sensorService.get("SENSOR-001")).thenReturn(sensor(8.0));
+
+        AnomalyReportResponse r = service.allAnomalies("SENSOR-001", FROM, TO, 3.0, 50, 210, 250, 80);
+
+        assertThat(r.measurementCount()).isEqualTo(288);
+        assertThat(r.anomalyCountByMethod()).containsEntry(AnomalyType.THRESHOLD, 1L)
+                .containsEntry(AnomalyType.Z_SCORE, 1L)
+                .containsEntry(AnomalyType.POWER_VARIATION, 1L)
+                .containsEntry(AnomalyType.VOLTAGE, 0L)
+                .containsEntry(AnomalyType.TEMPERATURE, 0L);
+        assertThat(r.anomalies()).allMatch(a -> a.timestamp().equals(Instant.parse("2026-09-30T14:00:00Z")));
+    }
+
+    @Test
+    @DisplayName("anomalies/all : tension max ≤ tension min → InvalidAnalyticsRequestException (→ 400)")
+    void allAnomaliesInvalidVoltageRange() {
+        assertThatThrownBy(() -> service.allAnomalies("SENSOR-001", FROM, TO, 3.0, 50, 250, 210, 80))
+                .isInstanceOf(InvalidAnalyticsRequestException.class);
+    }
+
+    @Test
+    @DisplayName("anomalies : le décompte ne contient que les méthodes du niveau B")
+    void basicCountsOnlyLevelB() {
+        when(sensorService.get("SENSOR-001")).thenReturn(sensor(8.0));
+
+        AnomalyReportResponse r = service.anomalies("SENSOR-001", FROM, TO, 3.0);
+
+        assertThat(r.anomalyCountByMethod()).containsOnlyKeys(AnomalyType.THRESHOLD, AnomalyType.Z_SCORE);
+    }
+
+    @Test
     @DisplayName("Capteur sans maxPowerKw : pas d'anomalie de seuil, le z-score fonctionne")
     void sensorWithoutThreshold() {
         when(sensorService.get("SENSOR-001")).thenReturn(sensor(null));

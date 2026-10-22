@@ -80,7 +80,7 @@ public class DemoMeasurementReader implements MeasurementReader {
         // Variation légère autour de 230V (±5V)
         double baseVoltage = 230.0;
         double variation = 5.0 * Math.sin(2 * Math.PI * hour / 24);
-        double noise = (2 * Math.floorMod(epochSecond, 10) / 9.0 - 1) * 0.5;
+        double noise = (2 * Math.floorMod(epochSecond / STEP.getSeconds(), 10) / 9.0 - 1) * 0.5;
         return Math.round((baseVoltage + variation + noise) * 10) / 10.0;
     }
 
@@ -91,7 +91,7 @@ public class DemoMeasurementReader implements MeasurementReader {
         // Variation entre 25°C et 45°C avec pic à 14h
         double baseTemp = 35.0;
         double variation = 10.0 * Math.sin(2 * Math.PI * hour / 24 - Math.PI / 2);
-        double noise = (2 * Math.floorMod(epochSecond, 7) / 6.0 - 1) * 1.0;
+        double noise = (2 * Math.floorMod(epochSecond / STEP.getSeconds(), 7) / 6.0 - 1) * 1.0;
         double temp = baseTemp + variation + noise;
         if (secondOfDay == SPIKE_TIME.toSecondOfDay()) {
             temp += 15.0; // Pic de température avec le pic de puissance
