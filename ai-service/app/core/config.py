@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     temperature_max: float = 80.0
     
     # Cassandra configuration
+    # Utiliser "cassandra" dans Docker, "localhost" en local
     cassandra_host: str = "localhost"
     cassandra_port: int = 9042
     cassandra_keyspace: str = "smartenergy"

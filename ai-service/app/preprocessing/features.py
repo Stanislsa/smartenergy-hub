@@ -1,6 +1,29 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from typing import List, Dict
+
+
+def to_hourly(measurements: List[Dict]) -> pd.DataFrame:
+    """
+    Regroupe les mesures par heure avec interpolation.
+    
+    Les lags (1, 2, 3, 6, 12, 24) supposent une mesure par heure,
+    mais les données sont toutes les 5 minutes. Cette fonction
+    regroupe par heure avant de créer les lags.
+    
+    Args:
+        measurements: Liste de mesures avec measured_at, power_kw, voltage, temperature
+    
+    Returns:
+        DataFrame avec index horaire et colonnes power_kw, voltage, temperature
+    """
+    df = pd.DataFrame(measurements)
+    df["measured_at"] = pd.to_datetime(df["measured_at"], utc=True)
+    return (df.set_index("measured_at")[["power_kw", "voltage", "temperature"]]
+              .resample("1h").mean()
+              .interpolate(limit=2)
+              .dropna())
 
 
 class FeatureExtractor:

@@ -35,5 +35,7 @@ async def predict_forecast(request: ForecastRequest):
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail="Modèle de prévision non disponible - entraînement requis")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
