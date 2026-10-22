@@ -21,7 +21,9 @@ import java.util.List;
  * La période étant limitée à 31 jours par {@code AnalyticsService}, cela fait au plus 32 requêtes.</p>
  *
  * <p>Les lignes sans puissance ou avec une puissance invalide (négative, NaN) sont ignorées
- * et signalées dans les logs : elles ne doivent pas fausser les calculs.</p>
+ * et signalées dans les logs : elles ne doivent pas fausser les calculs. La tension et la
+ * température sont facultatives : une valeur absente ou invalide est remplacée par {@code null}
+ * (la mesure est gardée, seules les détections de tension/température l'ignorent).</p>
  *
  * <p>Activé avec {@code analytics.measurement-source=cassandra}.</p>
  */
@@ -56,7 +58,8 @@ public class CassandraMeasurementReader implements MeasurementReader {
                     skipped++;
                     continue;
                 }
-                points.add(new MeasurementPoint(measuredAt, power));
+                points.add(new MeasurementPoint(measuredAt, power,
+                        validVoltage(row.getVoltage()), validTemperature(row.getTemperature())));
             }
         }
 
@@ -64,5 +67,15 @@ public class CassandraMeasurementReader implements MeasurementReader {
             log.warn("{} mesure(s) invalide(s) ignorée(s) pour {} entre {} et {}", skipped, sensorId, from, to);
         }
         return points;
+    }
+
+    /** Tension facultative : {@code null} si absente, négative ou non finie. */
+    static Double validVoltage(Double voltage) {
+        return (voltage != null && Double.isFinite(voltage) && voltage >= 0) ? voltage : null;
+    }
+
+    /** Température facultative : {@code null} si absente ou non finie. */
+    static Double validTemperature(Double temperature) {
+        return (temperature != null && Double.isFinite(temperature)) ? temperature : null;
     }
 }

@@ -38,6 +38,9 @@ public class AnalyticsService {
     /** Période maximale autorisée, pour éviter de lire un volume excessif de mesures. */
     public static final Duration MAX_PERIOD = Duration.ofDays(31);
 
+    /** Méthodes de {@code /anomalies} (niveau B du sujet). */
+    private static final List<AnomalyType> BASIC_METHODS = List.of(AnomalyType.THRESHOLD, AnomalyType.Z_SCORE);
+
     private final SensorService sensorService;
     private final MeasurementReader measurementReader;
     private final EnergyCalculator energyCalculator;
@@ -64,13 +67,8 @@ public class AnalyticsService {
 
         List<Anomaly> anomalies = anomalyDetector.detectAll(points, maxPowerKw, zThreshold);
 
-        return new AnomalyReportResponse(
-                sensorId, period.from(), period.to(),
-                points.size(),
-                maxPowerKw,
-                zThreshold,
-                anomalies.stream().filter(a -> a.type() == AnomalyType.THRESHOLD).count(),
-                anomalies.stream().filter(a -> a.type() == AnomalyType.Z_SCORE).count(),
+        return AnomalyReportResponse.of(sensorId, period.from(), period.to(), points.size(),
+                maxPowerKw, zThreshold, BASIC_METHODS,
                 anomalies.stream().map(AnomalyResponse::from).toList());
     }
 
@@ -99,6 +97,9 @@ public class AnalyticsService {
         if (!Double.isFinite(maxVoltage) || maxVoltage <= minVoltage) {
             throw new InvalidAnalyticsRequestException("La tension maximale doit être strictement supérieure à la minimale");
         }
+        if (!Double.isFinite(maxTemperature)) {
+            throw new InvalidAnalyticsRequestException("La température maximale doit être un nombre");
+        }
 
         AnalysisPeriod period = resolvePeriod(from, to, Instant.now());
         Double maxPowerKw = sensorThreshold(sensorId);
@@ -107,13 +108,8 @@ public class AnalyticsService {
         List<Anomaly> anomalies = anomalyDetector.detectAllAnomalies(
                 points, maxPowerKw, zThreshold, variationThreshold, minVoltage, maxVoltage, maxTemperature);
 
-        return new AnomalyReportResponse(
-                sensorId, period.from(), period.to(),
-                points.size(),
-                maxPowerKw,
-                zThreshold,
-                anomalies.stream().filter(a -> a.type() == AnomalyType.THRESHOLD).count(),
-                anomalies.stream().filter(a -> a.type() == AnomalyType.Z_SCORE).count(),
+        return AnomalyReportResponse.of(sensorId, period.from(), period.to(), points.size(),
+                maxPowerKw, zThreshold, List.of(AnomalyType.values()),
                 anomalies.stream().map(AnomalyResponse::from).toList());
     }
 

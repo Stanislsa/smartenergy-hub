@@ -71,6 +71,7 @@ Par défaut : `to` = maintenant, `from` = `to` − 24 h. Période maximale : 31 
 |---|---|
 | `GET /api/analytics/{sensorId}/summary?from=&to=` | Niveau A : moyenne, min, max, nombre de mesures, énergie, dépassements du `maxPowerKw` |
 | `GET /api/analytics/{sensorId}/anomalies?from=&to=&z=3` | Niveau B : anomalies par seuil et par z-score |
+| `GET /api/analytics/{sensorId}/anomalies/all?from=&to=&z=3&variation=50&minVoltage=210&maxVoltage=250&maxTemperature=80` | Détection étendue : les 5 méthodes ci-dessous |
 
 | Cas | Code |
 |---|---|
@@ -137,6 +138,28 @@ Le mapping (`MeasurementRow`, `MeasurementRowKey`) est propre à `analytics-serv
 
 Le seuil `maxPowerKw` est lu dans MongoDB via le `SensorService` existant (partie C).
 
+## Détection étendue (`/anomalies/all`)
+
+Ajoutée par Stan pour tenir compte de la tension et de la température des mesures, puis corrigée et testée.
+
+| Méthode | Règle | `score` | `limit` | `value` |
+|---|---|---|---|---|
+| `THRESHOLD` | P > maxPowerKw du capteur | P / Pmax | Pmax (kW) | — |
+| `Z_SCORE` | \|z\| > z | z | z | — |
+| `POWER_VARIATION` | \|ΔP / P(t-1)\| > variation % **et** \|ΔP\| ≥ 1 kW, hors retour à la normale | variation (%) | seuil (%) | — |
+| `VOLTAGE` | tension < minVoltage ou > maxVoltage | tension (V) | borne dépassée (V) | tension (V) |
+| `TEMPERATURE` | température > maxTemperature | température (°C) | maximum (°C) | température (°C) |
+
+- **Écart minimal de 1 kW** pour les variations : sans lui, 0,1 → 0,2 kW (+100 %) serait une alerte.
+- **Retour à la normale ignoré** : la mesure qui revient au niveau habituel juste après un pic
+  n'est pas une seconde anomalie (un pic = une alerte).
+- La tension et la température sont **facultatives** : lues dans Cassandra (colonnes `voltage`,
+  `temperature`) ; absentes ou invalides, elles valent `null` et seules les méthodes de puissance s'appliquent.
+- `anomalyCountByMethod` donne le nombre d'anomalies par méthode (0 compris).
+
+Sur 24 h de démo, le pic de 14h00 est signalé par `THRESHOLD`, `Z_SCORE` et `POWER_VARIATION`
+(une fois chacun) ; tension (224–236 V) et température (24–60 °C) restent dans les plages par défaut.
+
 ## Format erreur vs anomalie
 
 Une **erreur de format** (puissance négative, horodatage absent) est rejetée dès la création
@@ -150,11 +173,12 @@ est une mesure valide mais inhabituelle : elle est conservée et signalée.
 | Classe | Cas couverts |
 |---|---|
 | `EnergyCalculatorTest` | liste vide/null, une mesure, moyenne/min/max, énergie (intervalles réguliers et irréguliers), ordre d'entrée, dépassements stricts, absence de seuil, seuil invalide |
+| `ExtendedAnomalyDetectorTest` | pic signalé une fois (pas le retour), chute durable, petit écart ignoré, ordre indifférent, tension trop basse/haute avec la bonne borne, bornes incluses, température, 5 méthodes ensemble, mesures sans tension ni température |
 | `AnomalyDetectorTest` | seuil strict, Pmax absent/invalide, tri, pic ×3 détecté, chute détectée, σ = 0, trop peu de mesures, limite n < 11, seuil z invalide, combinaison des deux méthodes |
 | `MeasurementPointTest` | mesure valide, horodatage obligatoire, puissance négative ou NaN refusée |
 | `DemoMeasurementReaderTest` | 288 mesures / 24 h, début non aligné, pic de 14h00, reproductibilité |
-| `CassandraMeasurementReaderTest` | une journée = une partition, période sur 3 jours = 3 requêtes, `to` à minuit exclu, lignes invalides ignorées, période vide |
-| `AnalyticsServiceTest` | résumé et anomalies sur 24 h, capteur sans seuil, capteur inconnu, période invalide, z invalide, période par défaut, période > 31 jours |
-| `AnalyticsControllerTest` | 200 summary/anomalies, paramètres par défaut, 404 capteur inconnu, 400 période invalide, 400 date mal formée |
+| `CassandraMeasurementReaderTest` | une journée = une partition, période sur 3 jours = 3 requêtes, `to` à minuit exclu, lignes invalides ignorées, tension/température lues (invalides → null), période vide |
+| `AnalyticsServiceTest` | résumé et anomalies sur 24 h, détection étendue sur 24 h, décompte par méthode, capteur sans seuil, capteur inconnu, période invalide, z invalide, plage de tension invalide, période par défaut, période > 31 jours |
+| `AnalyticsControllerTest` | 200 summary/anomalies/anomalies-all, paramètres par défaut, 404 capteur inconnu, 400 période invalide, 400 date mal formée |
 
 Lancement : `./mvnw -pl analytics-service test` (Windows : `mvnw.cmd -pl analytics-service test`).

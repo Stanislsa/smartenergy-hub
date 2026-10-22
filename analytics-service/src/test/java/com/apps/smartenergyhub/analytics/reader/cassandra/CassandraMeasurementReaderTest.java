@@ -97,6 +97,27 @@ class CassandraMeasurementReaderTest {
     }
 
     @Test
+    @DisplayName("Tension et température lues ; valeurs invalides remplacées par null sans perdre la mesure")
+    void voltageAndTemperature() {
+        Instant from = Instant.parse("2026-10-21T08:00:00Z");
+        Instant to = Instant.parse("2026-10-21T09:00:00Z");
+        LocalDate day = LocalDate.parse("2026-10-21");
+        when(repository.findInPartitionBetween(SENSOR, day, from, to)).thenReturn(List.of(
+                new MeasurementRow(new MeasurementRowKey(SENSOR, day, Instant.parse("2026-10-21T08:05:00Z")), 3.72, 226.4, 29.1),
+                new MeasurementRow(new MeasurementRowKey(SENSOR, day, Instant.parse("2026-10-21T08:10:00Z")), 3.5, -1.0, Double.NaN),
+                new MeasurementRow(new MeasurementRowKey(SENSOR, day, Instant.parse("2026-10-21T08:15:00Z")), 3.4, null, null)));
+
+        List<MeasurementPoint> points = reader.findBySensorBetween(SENSOR, from, to);
+
+        assertThat(points).hasSize(3);
+        assertThat(points.get(0).voltage()).isEqualTo(226.4);
+        assertThat(points.get(0).temperature()).isEqualTo(29.1);
+        assertThat(points.get(1).voltage()).isNull();
+        assertThat(points.get(1).temperature()).isNull();
+        assertThat(points.get(2).voltage()).isNull();
+    }
+
+    @Test
     @DisplayName("Période vide (from ≥ to) : aucune requête Cassandra")
     void emptyPeriod() {
         Instant t = Instant.parse("2026-10-21T08:00:00Z");
