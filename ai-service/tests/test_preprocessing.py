@@ -9,7 +9,7 @@ def test_extract_temporal_features():
     features = FeatureExtractor.extract_temporal_features(timestamp)
     
     assert features["hour"] == 14
-    assert features["day_of_week"] == 2  # Mercredi
+    assert features["day_of_week"] == 3  # Jeudi
     assert features["is_weekend"] == False
     assert features["month"] == 10
 
