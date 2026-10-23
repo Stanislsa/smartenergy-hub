@@ -11,6 +11,7 @@ import com.apps.smartenergyhub.analytics.reader.MeasurementReader;
 import com.apps.smartenergyhub.analytics.repository.DailySummaryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.apps.smartenergyhub.analytics.calculator.Anomaly;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -44,8 +45,12 @@ public class DailySummaryAggregationService {
         }
 
         EnergyStatistics stats = energyCalculator.compute(points, threshold);
-        int anomalyCount = anomalyDetector
-                .detectAll(points, threshold, AnomalyDetector.DEFAULT_Z_THRESHOLD).size();
+        int anomalyCount = (int) anomalyDetector
+                .detectAll(points, threshold, AnomalyDetector.DEFAULT_Z_THRESHOLD)
+                .stream()
+                .map(Anomaly::timestamp)
+                .distinct()
+                .count();
 
         DailySummary summary = repository.findBySensorIdAndDate(sensorId, date.toString())
                 .orElseGet(() -> DailySummary.builder()
