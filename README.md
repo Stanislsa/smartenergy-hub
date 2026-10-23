@@ -56,6 +56,15 @@ graph TD
 
 ## 🚀 Démarrage Rapide
 
+### Démarrage avec Docker (tout-en-un)
+
+```powershell
+docker compose up -d --build collector-service storage-service analytics-service
+docker compose ps -a
+```
+Swagger : Collector http://localhost:8081/swagger-ui.html, Analytics http://localhost:8083/swagger-ui/index.html.
+Arrêt (les données sont conservées) : `docker compose down`. N'utilisez jamais `-v`.
+
 ### Prérequis
 - Java 17
 - Maven 3.8+
