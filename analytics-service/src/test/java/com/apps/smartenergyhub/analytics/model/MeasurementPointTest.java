@@ -34,4 +34,15 @@ class MeasurementPointTest {
         assertThatThrownBy(() -> new MeasurementPoint(T0, Double.NaN))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("Tension et température facultatives ; tension négative ou température NaN refusées")
+    void optionalVoltageAndTemperature() {
+        assertThatCode(() -> new MeasurementPoint(T0, 3.0, null, null)).doesNotThrowAnyException();
+        assertThatCode(() -> new MeasurementPoint(T0, 3.0, 230.0, -5.0)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> new MeasurementPoint(T0, 3.0, -1.0, 20.0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new MeasurementPoint(T0, 3.0, 230.0, Double.NaN))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
