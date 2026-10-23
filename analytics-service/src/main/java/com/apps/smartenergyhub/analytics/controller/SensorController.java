@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.apps.smartenergyhub.analytics.service.DailySummaryAggregationService;
 
 import java.net.URI;
 import java.time.LocalDate;
@@ -33,6 +34,7 @@ public class SensorController {
 
     private final SensorService sensorService;
     private final DailySummaryService summaryService;
+    private final DailySummaryAggregationService aggregationService;
 
     @PostMapping
     @Operation(summary = "Créer un capteur")
@@ -41,6 +43,14 @@ public class SensorController {
         return ResponseEntity
                 .created(URI.create("/api/sensors/" + created.sensorId()))
                 .body(created);
+    }
+
+    @PostMapping("/{sensorId}/daily-summary/compute")
+    @Operation(summary = "Calculer (ou recalculer) le résumé quotidien à partir des mesures")
+    public DailySummaryResponse computeDailySummary(
+            @PathVariable String sensorId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return aggregationService.compute(sensorId, date);
     }
 
     @GetMapping
