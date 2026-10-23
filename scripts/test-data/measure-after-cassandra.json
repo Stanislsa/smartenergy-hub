@@ -1,0 +1,7 @@
+{
+  "sensorId": "SENSOR-002",
+  "timestamp": "2026-10-23T20:25:00Z",
+  "powerKw": 3.70,
+  "voltage": 226.0,
+  "temperature": 29.0
+}
