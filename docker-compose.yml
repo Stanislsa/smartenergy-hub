@@ -1,3 +1,4 @@
+
 services:
   mongo:
     image: mongo:7
@@ -52,6 +53,82 @@ services:
     volumes:
       - ./ai-service:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8085 --reload
+
+  cassandra-init:
+    image: cassandra:5
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["cqlsh", "cassandra", "-f", "/scripts/init-cassandra.cql"]
+    restart: "no"
+
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["mongosh", "mongodb://mongo:27017/smartenergy", "--file", "/scripts/init-mongo.js"]
+    restart: "no"
+
+  collector-service:
+    build:
+      context: .
+      dockerfile: collector-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  storage-service:
+    build:
+      context: .
+      dockerfile: storage-service/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_MONGODB_HOST: mongo
+      SPRING_DATA_MONGODB_PORT: 27017
+      SPRING_CASSANDRA_CONTACT_POINTS: cassandra
+      SPRING_CASSANDRA_PORT: 9042
+      JAVA_TOOL_OPTIONS: -Xmx384m
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: analytics-service/Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_MONGODB_HOST: mongo
+      SPRING_DATA_MONGODB_PORT: 27017
+      SPRING_CASSANDRA_CONTACT_POINTS: cassandra
+      SPRING_CASSANDRA_PORT: 9042
+      JAVA_TOOL_OPTIONS: -Xmx384m
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      cassandra-init:
+        condition: service_completed_successfully
 
 volumes:
   mongo_data:

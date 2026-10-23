@@ -1,0 +1,8 @@
+.git
+**/target
+.idea
+.vscode
+.settings
+.classpath
+.project
+ai-service
