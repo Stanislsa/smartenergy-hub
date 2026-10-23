@@ -41,3 +41,21 @@ fréquence 50 Hz ± 0,05 ; température 26 °C ± 1,5. En pic : puissance entre 
 
 Toutes les 10 s : nombre de mesures envoyées, réponses 202, latence moyenne et p95.
 À la fin (ou Ctrl+C) : bilan avec codes HTTP et latences p50, p95, p99, max.
+
+## Jeu de données d'entraînement pour ai-service
+
+`generate-training-data.mjs` produit le CSV attendu par `ai-service/training/train_forecast_model.py`
+(`sensor_id, measured_at, power_kw, voltage, temperature`, plus `current, frequency, is_anomaly, anomaly_type`),
+avec le **même profil** que `send-measurements.mjs` (fichier commun `profile.mjs`) et les identifiants des
+capteurs de MongoDB.
+
+```cmd
+:: 90 jours, une mesure toutes les 5 min, capteurs lus dans MongoDB, sortie ai-service/data/raw/
+node scripts/load/generate-training-data.mjs
+:: avec une copie JSON
+node scripts/load/generate-training-data.mjs --json
+```
+
+Options : `--days` (90), `--step` en minutes (5), `--spike` (0.02), `--voltage-drop` (0.01), `--out`
+(`ai-service/data/raw`), `--json`, `--sensors ID:maxPowerKw,...` (si l'Analytics n'est pas lancé).
+Les fichiers générés ne sont pas destinés à être versionnés.

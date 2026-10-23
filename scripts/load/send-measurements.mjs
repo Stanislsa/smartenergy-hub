@@ -4,8 +4,7 @@
 // - La liste des capteurs vient de MongoDB via GET /api/sensors (analytics-service) : capteurs actifs uniquement.
 // - Chaque mesure est envoyée à POST /api/measurements (collector-service) et suit la vraie chaîne :
 //   Collector -> Redis Streams -> Storage -> Cassandra -> Analytics -> front.
-// - Les valeurs sont générées (comme un simulateur de compteurs) : puissance autour de 45 % du maxPowerKw
-//   du capteur avec un cycle jour/nuit, tension autour de 230 V, courant cohérent avec P = U × I.
+// - Les valeurs sont générées (comme un simulateur de compteurs) selon le profil de profile.mjs.
 //
 // Utilisation (depuis la racine du dépôt) :
 //   node scripts/load/send-measurements.mjs                       1 mesure/s, sans fin (Ctrl+C pour arrêter)
@@ -14,6 +13,8 @@
 //
 // Options : --rate <mesures/s> (défaut 1), --duration <s> (défaut : sans fin), --spike <0..1> (défaut 0),
 //           --collector <url> (défaut http://localhost:8081), --analytics <url> (défaut http://localhost:8083)
+
+import { generateMeasurement } from './profile.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, all) => {
@@ -37,31 +38,11 @@ function exit(msg) {
   process.exit(1)
 }
 
-const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d
-const noise = (amplitude) => (Math.random() * 2 - 1) * amplitude
-
-// Mesure d'un capteur à l'instant t
+// Mesure d'un capteur à l'instant t (profil commun : profile.mjs)
 function measurement(sensor, t) {
-  const hour = t.getUTCHours() + t.getUTCMinutes() / 60
-  const base = sensor.maxPowerKw * 0.45
-  // cycle jour/nuit : minimum vers 3 h UTC, maximum vers 15 h UTC (± 30 %)
-  let powerKw = base * (1 + 0.3 * Math.sin(((hour - 9) / 24) * 2 * Math.PI)) + noise(base * 0.05)
-  const spike = Math.random() < SPIKE
-  if (spike) powerKw = sensor.maxPowerKw * (1.2 + Math.random() * 0.4)
-  powerKw = Math.max(0, powerKw)
-  const voltage = 230 + noise(3)
-  return {
-    body: {
-      sensorId: sensor.sensorId,
-      timestamp: t.toISOString(),
-      powerKw: round(powerKw, 3),
-      voltage: round(voltage, 1),
-      current: round((powerKw * 1000) / voltage, 2),
-      frequency: round(50 + noise(0.05), 2),
-      temperature: round(26 + noise(1.5) + (spike ? 6 : 0), 1),
-    },
-    spike,
-  }
+  const m = generateMeasurement(sensor, t, { spike: SPIKE })
+  const { anomaly, ...body } = m
+  return { body, spike: anomaly === 'spike_power' }
 }
 
 // ---------- Statistiques ----------
