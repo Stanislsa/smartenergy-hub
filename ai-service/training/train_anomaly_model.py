@@ -80,13 +80,19 @@ class AnomalyModelTrainer:
         
         version = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Sauvegarder le modèle
+        # Sauvegarder le modèle avec version
         model_path = os.path.join(output_dir, f"model_v{version}.joblib")
         joblib.dump(self.model, model_path)
         
-        # Sauvegarder le scaler
+        # Sauvegarder le scaler avec version
         scaler_path = os.path.join(output_dir, f"scaler_v{version}.joblib")
         joblib.dump(self.scaler, scaler_path)
+        
+        # Sauvegarder sous v1 pour le service
+        model_v1_path = os.path.join(output_dir, "model_v1.joblib")
+        scaler_v1_path = os.path.join(output_dir, "scaler_v1.joblib")
+        joblib.dump(self.model, model_v1_path)
+        joblib.dump(self.scaler, scaler_v1_path)
         
         # Sauvegarder les métadonnées
         metadata = {
@@ -104,18 +110,15 @@ class AnomalyModelTrainer:
         
         print(f"Modèle sauvegardé: {model_path}")
         print(f"Scaler sauvegardé: {scaler_path}")
+        print(f"Modèle v1 sauvegardé: {model_v1_path}")
+        print(f"Scaler v1 sauvegardé: {scaler_v1_path}")
         print(f"Métadonnées sauvegardées: {metadata_path}")
 
 
 if __name__ == "__main__":
     print("=== Entraînement du modèle d'anomalie ===")
-    
-    # NOTE: Ce script ne peut pas être exécuté tant que le dataset n'est pas disponible
-    print("ATTENTION: Le dataset doit d'abord être généré via build_dataset.py")
-    
-    # Exemple d'utilisation (commenté):
-    # trainer = AnomalyModelTrainer()
-    # df = trainer.load_data()
-    # X_train, X_test = trainer.preprocess_data(df)
-    # trainer.train_model(X_train)
-    # trainer.save_model()
+    trainer = AnomalyModelTrainer("data/raw/dataset.csv")
+    df = trainer.load_data()
+    X_train, X_test = trainer.preprocess_data(df)
+    trainer.train_model(X_train)
+    trainer.save_model()

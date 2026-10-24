@@ -1,0 +1,16 @@
+{
+  "version": "20261024_012545",
+  "sensor_id": null,
+  "model_type": "LSTM",
+  "features": [
+    "power_kw",
+    "voltage",
+    "temperature",
+    "hour",
+    "day_of_week",
+    "is_weekend",
+    "month"
+  ],
+  "sequence_length": 168,
+  "trained_at": "2026-10-24T01:25:46.324360"
+}

@@ -20,19 +20,23 @@ class ForecastService:
         self.model: Optional[RandomForestRegressor] = None
         self.scaler: Optional[StandardScaler] = None
         self.is_loaded = False
-        self.model_path = "artifacts/forecast_model/forecast_model_v1.joblib"
-        self.scaler_path = "artifacts/forecast_model/forecast_scaler_v1.joblib"
+        self.current_sensor_id: Optional[str] = None
         self.cassandra = CassandraService()
     
-    def load_model(self):
+    def load_model(self, sensor_id: str = None):
         """Charge le modèle et le scaler depuis les fichiers."""
-        if not os.path.exists(self.model_path):
-            raise FileNotFoundError(f"Modèle non trouvé: {self.model_path}")
+        sensor_suffix = f"_{sensor_id}" if sensor_id else ""
+        model_path = f"artifacts/forecast_model/forecast_model_v1{sensor_suffix}.joblib"
+        scaler_path = f"artifacts/forecast_model/forecast_scaler_v1{sensor_suffix}.joblib"
         
-        self.model = joblib.load(self.model_path)
-        self.scaler = joblib.load(self.scaler_path)
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Modèle non trouvé: {model_path}")
+        
+        self.model = joblib.load(model_path)
+        self.scaler = joblib.load(scaler_path)
         self.is_loaded = True
-        logger.info(f"Modèle chargé: {self.model_path}")
+        self.current_sensor_id = sensor_id
+        logger.info(f"Modèle chargé: {model_path}")
     
     def get_features_from_cassandra(self, sensor_id: str, hours: int = 24) -> np.ndarray:
         """
@@ -87,19 +91,20 @@ class ForecastService:
         
         return features
     
-    def predict(self, features: np.ndarray, horizon_minutes: int = 60) -> Dict:
+    def predict(self, features: np.ndarray, horizon_minutes: int = 60, sensor_id: str = None) -> Dict:
         """
         Prédit la consommation future.
         
         Args:
             features: Features pour la prédiction
             horizon_minutes: Horizon de prévision en minutes
+            sensor_id: Identifiant du capteur pour charger le bon modèle
         
         Returns:
             Dictionnaire avec la prédiction et l'intervalle de confiance
         """
-        if not self.is_loaded:
-            self.load_model()
+        if not self.is_loaded or (sensor_id and sensor_id != self.current_sensor_id):
+            self.load_model(sensor_id)
         
         features_scaled = self.scaler.transform(features)
         prediction = self.model.predict(features_scaled)[0]

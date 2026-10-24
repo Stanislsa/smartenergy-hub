@@ -1,0 +1,22 @@
+{
+  "version": "20261024_020134",
+  "sensor_id": "SENSOR-001",
+  "model_type": "RandomForestRegressor",
+  "features": [
+    "power_kw_lag_1",
+    "power_kw_lag_2",
+    "power_kw_lag_3",
+    "power_kw_lag_6",
+    "power_kw_lag_12",
+    "power_kw_lag_24",
+    "hour",
+    "day_of_week",
+    "is_weekend",
+    "month",
+    "voltage",
+    "temperature"
+  ],
+  "n_estimators": 100,
+  "max_depth": 10,
+  "trained_at": "2026-10-24T02:01:35.026833"
+}

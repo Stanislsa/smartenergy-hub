@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Données
+data/raw/*.csv
+data/raw/*.json
+
+# Modèles entraînés
+artifacts/**/*.joblib
+artifacts/**/*.keras
+artifacts/**/*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

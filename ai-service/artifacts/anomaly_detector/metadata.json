@@ -1,0 +1,11 @@
+{
+  "version": "20261024_020211",
+  "model_type": "IsolationForest",
+  "features": [
+    "power_kw",
+    "voltage",
+    "temperature"
+  ],
+  "contamination": 0.1,
+  "trained_at": "2026-10-24T02:02:11.619739"
+}

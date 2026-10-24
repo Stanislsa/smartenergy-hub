@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { api, settle } from './api/client'
-import { last24h } from './utils'
+import { useEffect, useState } from 'react';
+import { api, settle } from './api/client';
+import { last24h } from './utils';
 
 // Services vérifiés depuis le navigateur.
 // - Collector, Storage, Analytics, IA : endpoint /health de chaque service.
@@ -14,7 +14,7 @@ export const SERVICES = [
   { key: 'ai', label: 'Service IA', port: 8085 },
   { key: 'mongodb', label: 'MongoDB', port: 27018 },
   { key: 'cassandra', label: 'Cassandra', port: 9042 },
-]
+];
 
 export async function checkServices() {
   const [collector, storage, analytics, ai, sensors] = await Promise.all([
@@ -23,12 +23,12 @@ export async function checkServices() {
     settle(api.health('analytics')),
     settle(api.health('ai')),
     settle(api.sensors()),
-  ])
-  let cassandra = { ok: false }
+  ]);
+  let cassandra = { ok: false };
   if (sensors.ok && sensors.value.length) {
-    const r = await settle(api.latest(sensors.value[0].sensorId))
+    const r = await settle(api.latest(sensors.value[0].sensorId));
     // 404 = capteur sans mesure : Cassandra a répondu
-    cassandra = { ok: r.ok || r.error?.status === 404 }
+    cassandra = { ok: r.ok || r.error?.status === 404 };
   }
   return {
     collector: collector.ok,
@@ -37,32 +37,35 @@ export async function checkServices() {
     ai: ai.ok,
     mongodb: sensors.ok,
     cassandra: cassandra.ok,
-  }
+  };
 }
 
 export function useServices(intervalMs = 30000) {
-  const [state, setState] = useState(null)
+  const [state, setState] = useState(null);
   useEffect(() => {
-    let alive = true
-    const tick = () => checkServices().then((s) => alive && setState(s))
-    tick()
-    const id = setInterval(tick, intervalMs)
+    let alive = true;
+    const tick = () => checkServices().then(s => alive && setState(s));
+    tick();
+    const id = setInterval(tick, intervalMs);
     return () => {
-      alive = false
-      clearInterval(id)
-    }
-  }, [intervalMs])
-  return state
+      alive = false;
+      clearInterval(id);
+    };
+  }, [intervalMs]);
+  return state;
 }
 
 // Anomalies des dernières 24 h sur tous les capteurs actifs (une requête par capteur)
 export async function recentAnomalies(sensors) {
-  const { from, to } = last24h()
-  const active = sensors.filter((s) => s.active)
-  const reports = await Promise.all(active.map((s) => settle(api.anomalies(s.sensorId, from, to))))
-  const list = []
+  const { from, to } = last24h();
+  const active = sensors.filter(s => s.active);
+  const reports = await Promise.all(active.map(s => settle(api.anomalies(s.sensorId, from, to))));
+  const list = [];
   reports.forEach((r, i) => {
-    if (r.ok) r.value.anomalies.forEach((a) => list.push({ ...a, sensorId: active[i].sensorId, sensorName: active[i].name }))
-  })
-  return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    if (r.ok)
+      r.value.anomalies.forEach(a =>
+        list.push({ ...a, sensorId: active[i].sensorId, sensorName: active[i].name })
+      );
+  });
+  return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }

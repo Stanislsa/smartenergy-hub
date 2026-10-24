@@ -17,7 +17,7 @@ from app.preprocessing.features import to_hourly
 
 
 class ForecastModelTrainer:
-    def __init__(self, data_path: str = "data/raw/forecast_dataset.csv"):
+    def __init__(self, data_path: str = "data/raw/dataset.csv"):
         self.data_path = data_path
         self.model: RandomForestRegressor = None
         self.scaler: StandardScaler = None
@@ -157,23 +157,31 @@ class ForecastModelTrainer:
             "mape": float(mape)
         }
     
-    def save_model(self, output_dir: str = "artifacts/forecast_model"):
+    def save_model(self, output_dir: str = "artifacts/forecast_model", sensor_id: str = None):
         """Sauvegarde le modèle et le scaler"""
         os.makedirs(output_dir, exist_ok=True)
         
         version = datetime.now().strftime("%Y%m%d_%H%M%S")
+        sensor_suffix = f"_{sensor_id}" if sensor_id else ""
         
-        # Sauvegarder le modèle
-        model_path = os.path.join(output_dir, f"forecast_model_v{version}.joblib")
+        # Sauvegarder le modèle avec version
+        model_path = os.path.join(output_dir, f"forecast_model_v{version}{sensor_suffix}.joblib")
         joblib.dump(self.model, model_path)
         
-        # Sauvegarder le scaler
-        scaler_path = os.path.join(output_dir, f"forecast_scaler_v{version}.joblib")
+        # Sauvegarder le scaler avec version
+        scaler_path = os.path.join(output_dir, f"forecast_scaler_v{version}{sensor_suffix}.joblib")
         joblib.dump(self.scaler, scaler_path)
+        
+        # Sauvegarder sous v1 pour le service (avec sensor_id si spécifié)
+        model_v1_path = os.path.join(output_dir, f"forecast_model_v1{sensor_suffix}.joblib")
+        scaler_v1_path = os.path.join(output_dir, f"forecast_scaler_v1{sensor_suffix}.joblib")
+        joblib.dump(self.model, model_v1_path)
+        joblib.dump(self.scaler, scaler_v1_path)
         
         # Sauvegarder les métadonnées
         metadata = {
             "version": version,
+            "sensor_id": sensor_id,
             "model_type": "RandomForestRegressor",
             "features": self.features,
             "n_estimators": 100,
@@ -181,27 +189,43 @@ class ForecastModelTrainer:
             "trained_at": datetime.now().isoformat()
         }
         
-        metadata_path = os.path.join(output_dir, "forecast_metadata.json")
+        metadata_path = os.path.join(output_dir, f"forecast_metadata{sensor_suffix}.json")
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
         
         print(f"Modèle sauvegardé: {model_path}")
         print(f"Scaler sauvegardé: {scaler_path}")
+        print(f"Modèle v1 sauvegardé: {model_v1_path}")
+        print(f"Scaler v1 sauvegardé: {scaler_v1_path}")
         print(f"Métadonnées sauvegardées: {metadata_path}")
 
 
 if __name__ == "__main__":
     print("=== Entraînement du modèle de prévision ===")
+    trainer = ForecastModelTrainer("data/raw/dataset.csv")
+    df = trainer.load_data()
     
-    # NOTE: Ce script ne peut pas être exécuté tant que le dataset n'est pas disponible
-    print("ATTENTION: Le dataset doit d'abord être généré via build_dataset.py")
-    print("Le dataset doit contenir un historique suffisant (1000+ mesures par capteur)")
-    
-    # Exemple d'utilisation (commenté):
-    # trainer = ForecastModelTrainer("data/raw/forecast_dataset.csv")
-    # df = trainer.load_data()
-    # df = trainer.create_lag_features(df)
-    # X_train, X_test, y_train, y_test = trainer.preprocess_data(df)
-    # trainer.train_model(X_train, y_train)
-    # metrics = trainer.evaluate_model(X_test, y_test)
-    # trainer.save_model()
+    # Entraîner un modèle par capteur
+    if "sensor_id" in df.columns:
+        sensor_ids = df["sensor_id"].unique()
+        print(f"Capteurs détectés: {sensor_ids}")
+        
+        for sensor_id in sensor_ids:
+            print(f"\n--- Entraînement pour capteur {sensor_id} ---")
+            df_sensor = trainer.create_lag_features(df, sensor_id=sensor_id)
+            
+            if len(df_sensor) < 100:
+                print(f"Skipping {sensor_id}: données insuffisantes ({len(df_sensor)} lignes)")
+                continue
+            
+            X_train, X_test, y_train, y_test = trainer.preprocess_data(df_sensor)
+            trainer.train_model(X_train, y_train)
+            metrics = trainer.evaluate_model(X_test, y_test)
+            trainer.save_model(sensor_id=sensor_id)
+    else:
+        # Entraînement global (sans sensor_id)
+        df = trainer.create_lag_features(df)
+        X_train, X_test, y_train, y_test = trainer.preprocess_data(df)
+        trainer.train_model(X_train, y_train)
+        metrics = trainer.evaluate_model(X_test, y_test)
+        trainer.save_model()

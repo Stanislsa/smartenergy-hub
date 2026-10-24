@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Dict
 
 
-def to_hourly(measurements: List[Dict]) -> pd.DataFrame:
+def to_hourly(measurements: List[Dict], sensor_id: str = None) -> pd.DataFrame:
     """
     Regroupe les mesures par heure avec interpolation.
     
@@ -13,17 +13,36 @@ def to_hourly(measurements: List[Dict]) -> pd.DataFrame:
     regroupe par heure avant de créer les lags.
     
     Args:
-        measurements: Liste de mesures avec measured_at, power_kw, voltage, temperature
+        measurements: Liste de mesures avec measured_at, power_kw, voltage, temperature, sensor_id
+        sensor_id: Filtrer par capteur (optionnel)
     
     Returns:
-        DataFrame avec index horaire et colonnes power_kw, voltage, temperature
+        DataFrame avec index horaire et colonnes power_kw, voltage, temperature, sensor_id
     """
     df = pd.DataFrame(measurements)
     df["measured_at"] = pd.to_datetime(df["measured_at"], utc=True)
-    return (df.set_index("measured_at")[["power_kw", "voltage", "temperature"]]
+    
+    # Filtrer par sensor_id si spécifié
+    if sensor_id and "sensor_id" in df.columns:
+        df = df[df["sensor_id"] == sensor_id].copy()
+    
+    # Séparer sensor_id pour l'agrégation
+    sensor_id_col = None
+    if "sensor_id" in df.columns:
+        sensor_id_col = df["sensor_id"].iloc[0] if len(df) > 0 else None
+        df = df.drop(columns=["sensor_id"])
+    
+    # Agréger les colonnes numériques
+    result = (df.set_index("measured_at")[["power_kw", "voltage", "temperature"]]
               .resample("1h").mean()
               .interpolate(limit=2)
               .dropna())
+    
+    # Réajouter sensor_id si présent
+    if sensor_id_col is not None:
+        result["sensor_id"] = sensor_id_col
+    
+    return result
 
 
 class FeatureExtractor:

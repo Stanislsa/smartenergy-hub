@@ -17,13 +17,11 @@ async def predict_forecast(request: ForecastRequest):
     Convient pour les prévisions à court terme (heures/jours).
     """
     try:
-        if not forecast_service.is_loaded:
-            forecast_service.load_model()
-        
         # Récupérer les features depuis Cassandra
         features = forecast_service.get_features_from_cassandra(request.sensor_id)
         
-        prediction = forecast_service.predict(features, request.horizon_minutes)
+        # Prédire avec le modèle spécifique au capteur
+        prediction = forecast_service.predict(features, request.horizon_minutes, sensor_id=request.sensor_id)
         
         return ForecastResponse(
             sensor_id=request.sensor_id,

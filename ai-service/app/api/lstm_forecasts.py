@@ -23,9 +23,6 @@ async def predict_lstm_forecast(request: ForecastRequest):
     Nécessite 168 heures (7 jours) d'historique.
     """
     try:
-        if not lstm_service.is_loaded:
-            lstm_service.load_model()
-        
         # Récupérer les 168 dernières heures depuis Cassandra
         hours_needed = 168
         measurements = cassandra.get_latest_measurements(request.sensor_id, hours_needed)
@@ -56,7 +53,8 @@ async def predict_lstm_forecast(request: ForecastRequest):
         available_cols = [c for c in feature_cols if c in df_hourly.columns]
         features_array = df_hourly[available_cols].tail(hours_needed).values
         
-        prediction = lstm_service.predict(features_array, request.horizon_minutes)
+        # Prédire avec le modèle spécifique au capteur
+        prediction = lstm_service.predict(features_array, request.horizon_minutes, sensor_id=request.sensor_id)
         
         return ForecastResponse(
             sensor_id=request.sensor_id,

@@ -1,6 +1,7 @@
 from app.schemas.measurement import MeasurementRequest, AnomalyResponse
 from app.models.anomaly_detector import AnomalyDetector
 from app.core.config import get_settings
+import numpy as np
 
 class InferenceService:
     def __init__(self):
@@ -31,6 +32,19 @@ class InferenceService:
             reasons.append(f"Température excessive: {measurement.temperature} °C")
             is_anomaly = True
             score = max(score, 0.9)
+        
+        # Utiliser le modèle ML si disponible
+        if measurement.voltage and measurement.temperature:
+            features = np.array([[measurement.power_kw, measurement.voltage, measurement.temperature]])
+            ml_score = self.detector.predict(features)[0]
+            # IsolationForest retourne des scores négatifs (anomalie) et positifs (normal)
+            # On convertit en score 0-1
+            ml_anomaly_score = 1 / (1 + np.exp(ml_score))
+            
+            if ml_anomaly_score < 0.3:  # Seuil d'anomalie
+                reasons.append("Anomalie détectée par modèle ML")
+                is_anomaly = True
+                score = max(score, ml_anomaly_score)
         
         severity = "HIGH" if score >= 0.8 else "MEDIUM" if score >= 0.5 else "NORMAL"
         

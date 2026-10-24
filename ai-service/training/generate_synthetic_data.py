@@ -10,7 +10,7 @@ import os
 
 
 def generate_synthetic_measurements(
-    output_path: str = "data/raw/forecast_dataset.csv",
+    output_path: str = "data/raw/dataset.csv",
     num_sensors: int = 5,
     days: int = 30,
     start_date: datetime = None
@@ -110,7 +110,7 @@ def generate_synthetic_measurements(
 if __name__ == "__main__":
     print("=== Génération de données synthétiques ===")
     generate_synthetic_measurements(
-        output_path="data/raw/forecast_dataset.csv",
+        output_path="data/raw/dataset.csv",
         num_sensors=5,
         days=30
     )
