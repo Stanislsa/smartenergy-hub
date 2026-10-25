@@ -45,17 +45,18 @@ class AnomalyModelTrainer:
                 median = X[col].median()
                 X[col] = X[col].fillna(median)
         
-        # Normalisation
-        self.scaler = StandardScaler()
-        X_scaled = self.scaler.fit_transform(X)
-        
-        # Séparation train/test (chronologique)
+        # Séparation train/test (chronologique) AVANT normalisation
         X_train, X_test = train_test_split(
-            X_scaled, test_size=0.2, shuffle=False
+            X, test_size=0.2, shuffle=False
         )
         
+        # Normalisation: fit uniquement sur train, transform sur train et test
+        self.scaler = StandardScaler()
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_test_scaled = self.scaler.transform(X_test)
+        
         print(f"Train: {len(X_train)} samples, Test: {len(X_test)} samples")
-        return X_train, X_test
+        return X_train_scaled, X_test_scaled
     
     def train_model(self, X_train: np.ndarray, contamination: float = 0.1):
         """

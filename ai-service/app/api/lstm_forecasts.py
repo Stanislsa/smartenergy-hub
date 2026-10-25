@@ -53,15 +53,16 @@ async def predict_lstm_forecast(request: ForecastRequest):
         available_cols = [c for c in feature_cols if c in df_hourly.columns]
         features_array = df_hourly[available_cols].tail(hours_needed).values
         
+        print(f"Features array shape: {features_array.shape}, Columns: {available_cols}")
+        
         # Prédire avec le modèle spécifique au capteur
         prediction = lstm_service.predict(features_array, request.horizon_minutes, sensor_id=request.sensor_id)
         
         return ForecastResponse(
             sensor_id=request.sensor_id,
-            forecast_time=prediction["forecast_time"],
+            forecast_start=datetime.utcnow(),
             horizon_minutes=request.horizon_minutes,
-            predicted_power_kw=prediction["predicted_power_kw"],
-            confidence_interval=prediction["confidence_interval"],
+            forecast_series=prediction["forecast_series"],
             model_version="lstm-v1"
         )
     except FileNotFoundError as e:

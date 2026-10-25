@@ -11,6 +11,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    profiles:
+      - ai
+      - all
 
   redis:
     image: redis:7
@@ -23,6 +26,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    profiles:
+      - ai
+      - all
 
   cassandra:
     image: cassandra:5
@@ -36,6 +42,9 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
+    profiles:
+      - ai
+      - all
 
   ai-service:
     build:
@@ -51,8 +60,11 @@ services:
       cassandra:
         condition: service_healthy
     volumes:
-      - ./ai-service:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8085 --reload
+      - ./ai-service/artifacts:/app/artifacts:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8085
+    profiles:
+      - ai
+      - all
 
   cassandra-init:
     image: cassandra:5
@@ -63,6 +75,9 @@ services:
       - ./scripts:/scripts:ro
     command: ["cqlsh", "cassandra", "-f", "/scripts/init-cassandra.cql"]
     restart: "no"
+    profiles:
+      - ai
+      - all
 
   mongo-init:
     image: mongo:7
@@ -73,6 +88,9 @@ services:
       - ./scripts:/scripts:ro
     command: ["mongosh", "mongodb://mongo:27017/smartenergy", "--file", "/scripts/init-mongo.js"]
     restart: "no"
+    profiles:
+      - ai
+      - all
 
   collector-service:
     build:
@@ -87,6 +105,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    profiles:
+      - all
 
   storage-service:
     build:
@@ -109,6 +129,8 @@ services:
         condition: service_healthy
       cassandra-init:
         condition: service_completed_successfully
+    profiles:
+      - all
 
   analytics-service:
     build:
@@ -129,6 +151,8 @@ services:
         condition: service_completed_successfully
       cassandra-init:
         condition: service_completed_successfully
+    profiles:
+      - all
 
 volumes:
   mongo_data:

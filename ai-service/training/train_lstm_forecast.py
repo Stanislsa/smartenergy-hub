@@ -3,6 +3,10 @@ Script d'entraînement du modèle LSTM pour prévisions à long terme.
 Utilise LSTM pour prédire la puissance future (semaines/mois).
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
 import numpy as np
 from tensorflow.keras.models import Sequential
@@ -11,7 +15,6 @@ from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
-import os
 import json
 from datetime import datetime
 from app.preprocessing.features import to_hourly
@@ -77,14 +80,19 @@ class LSTMForecastTrainer:
         available_features = [f for f in self.features if f in df.columns]
         data = df[available_features].copy()
         
+        # Séparation train/test (chronologique) AVANT normalisation
+        split_idx = int(len(data) * 0.8)
+        data_train = data.iloc[:split_idx]
+        data_test = data.iloc[split_idx:]
+        
+        # Normalisation: fit uniquement sur train, transform sur train et test
         self.scaler = MinMaxScaler(feature_range=(0, 1))
-        data_scaled = self.scaler.fit_transform(data)
+        data_train_scaled = self.scaler.fit_transform(data_train)
+        data_test_scaled = self.scaler.transform(data_test)
         
-        X, y = self.create_sequences(data_scaled)
-        
-        split_idx = int(len(X) * 0.8)
-        X_train, X_test = X[:split_idx], X[split_idx:]
-        y_train, y_test = y[:split_idx], y[split_idx:]
+        # Créer les séquences sur train et test séparément
+        X_train, y_train = self.create_sequences(data_train_scaled)
+        X_test, y_test = self.create_sequences(data_test_scaled)
         
         print(f"Train: {len(X_train)} sequences, Test: {len(X_test)} sequences")
         print(f"Sequence shape: {X_train.shape}")

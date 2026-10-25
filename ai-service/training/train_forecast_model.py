@@ -3,6 +3,10 @@ Script d'entraînement du modèle de prévision de consommation.
 Utilise Random Forest Regressor pour prédire la puissance future.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -10,7 +14,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
-import os
 import json
 from datetime import datetime
 from app.preprocessing.features import to_hourly
@@ -94,17 +97,18 @@ class ForecastModelTrainer:
                 median = X[col].median()
                 X[col] = X[col].fillna(median)
         
-        # Normalisation
-        self.scaler = StandardScaler()
-        X_scaled = self.scaler.fit_transform(X)
-        
-        # Séparation train/test (chronologique)
+        # Séparation train/test (chronologique) AVANT normalisation
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=0.2, shuffle=False
+            X, y, test_size=0.2, shuffle=False
         )
         
+        # Normalisation: fit uniquement sur train, transform sur train et test
+        self.scaler = StandardScaler()
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_test_scaled = self.scaler.transform(X_test)
+        
         print(f"Train: {len(X_train)} samples, Test: {len(X_test)} samples")
-        return X_train, X_test, y_train, y_test
+        return X_train_scaled, X_test_scaled, y_train, y_test
     
     def train_model(self, X_train: np.ndarray, y_train: np.ndarray):
         """
