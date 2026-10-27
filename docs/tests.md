@@ -13,7 +13,7 @@ de `docs/api-recomandation.md` (section 6). Responsable : partie D.
 | Services | Collector 8081 (Salomi), Storage 8082 (Stan), Analytics 8083 (Lalia, Tiana) |
 | Données de test | `scripts/test-data/` (mesures JSON et CQL) |
 | Capteur de test | `SENSOR-002` pour la chaîne complète, `SENSOR-001` pour le pic |
-| Date d'exécution | 22/10/2026 (n° 4), 24/10/2026 (autres scénarios) |
+| Date d'exécution | 22/10/2026 (n° 4), 24/10/2026 (autres scénarios), 27/10/2026 (C8 après correctif) |
 
 Lancement des services, un terminal par service, depuis la racine du dépôt :
 
@@ -167,7 +167,7 @@ Obtenu (24/10/2026) : le Storage démarre en 9,9 s, puis enregistre immédiateme
 | C5 | La mesure peut être relue par capteur et par jour | N° 3 | ✅ |
 | C6 | L'ACK est exécuté après l'écriture | N° 1 (XPENDING = 0) | ✅ |
 | C7 | Une panne temporaire de Cassandra ne provoque pas de perte silencieuse | P2 | ✅ erreur loguée, message conservé en attente |
-| C8 | Le consommateur reprend les messages en attente | N° 6 et P2 | ❌ n° 6 OK, mais P2 : le message en attente n'est jamais relu |
+| C8 | Le consommateur reprend les messages en attente | N° 6 et P2 | ✅ n° 6 OK ; P2 corrigé le 27/10/2026 (relecture des messages en attente, voir P2 et Observations) |
 | C9 | Une nouvelle tentative ne provoque pas de doublon logique | P3 | ✅ |
 
 ### P1 — Persistance après redémarrage du système (22.3, n° 7)
@@ -209,7 +209,18 @@ Obtenu (24/10/2026) :
 | Après `docker compose restart` | 20:20 toujours en attente (`pending` = 1) |
 
 C7 ✅ : pas de perte silencieuse (erreur loguée, message conservé dans Redis).
-C8 ❌ : le message en attente n'est jamais retraité ; seuls les nouveaux messages sont lus. Voir Observations.
+C8 ❌ le 24/10/2026 : le message en attente n'était jamais retraité ; seuls les nouveaux messages étaient lus. Voir Observations.
+
+Après correctif (27/10/2026), même scénario avec `SENSOR-001` et une mesure de 21:30:00Z, Storage lancé en local (`mvn spring-boot:run`) :
+
+| Étape | Résultat |
+|---|---|
+| Cassandra arrêtée, envoi de 21:30:00Z | `202` |
+| Redis | `XPENDING` = 1 (message attribué à `storage-consumer-1`) |
+| Cassandra relancée (`healthy`), Storage redémarré | `XPENDING` = 0 |
+| Cassandra | ligne `2026-10-26 21:30:00` (3,72 kW) présente |
+
+C8 ✅ après correctif.
 
 ### P3 — Doublon (C9, sujet 15.1 « idempotence »)
 
@@ -244,6 +255,8 @@ Cassandra ont été faites avec `docker compose exec` (XLEN, XINFO GROUPS, XPEND
    la liste des messages en attente du groupe et n'est plus jamais retraité, même après le retour de Cassandra
    ou un redémarrage. Piste : relire au démarrage et périodiquement les messages en attente du consommateur
    (lecture avec l'offset `0`, ou `XAUTOCLAIM`) avant les nouveaux.
+
+   **Corrigé le 27/10/2026** : `RedisStreamConsumer` lit d'abord les messages en attente du consommateur (`ReadOffset.from("0")`), puis les nouveaux. Un message invalide (champ manquant, date illisible) est acquitté et journalisé en erreur, pour ne pas être relu indéfiniment. Limite : seuls les messages attribués au même nom de consommateur (`storage-consumer-1`) sont relus ; `XAUTOCLAIM` serait nécessaire pour reprendre ceux d'un autre consommateur.
 2. **Arrêt du Storage (n° 5, n° 6).** Fonctionne : les messages non lus restent dans le flux (`lag`) et sont
    traités au redémarrage. La différence avec P2 : ici les messages n'avaient jamais été lus.
 3. **Idempotence (C9).** Assurée par la clé primaire Cassandra : un renvoi écrase la ligne. Le `record_id` (UUID)
