@@ -12,6 +12,8 @@ import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.data.redis.connection.stream.StreamReadOptions;
+import java.time.DateTimeException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -72,19 +74,26 @@ public class RedisStreamConsumer {
     @Scheduled(fixedDelay = 1000) // Vérifie toutes les secondes
     public void consumeMessages() {
         try {
-            // Lire les messages non acquittés pour ce consommateur
-            var messages = redisTemplate.opsForStream()
-                    .read(Consumer.from(consumerGroup, consumerName),
-                          StreamOffset.create(streamName, ReadOffset.lastConsumed()));
-
-            if (messages != null && !messages.isEmpty()) {
-                for (MapRecord<String, Object, Object> message : messages) {
-                    processMessage(message);
-                }
-            }
+            // 1. D'abord les messages déjà lus par ce consumer mais jamais acquittés
+            processBatch(ReadOffset.from("0"));
+            // 2. Ensuite les nouveaux messages
+            processBatch(ReadOffset.lastConsumed());
         } catch (Exception e) {
             log.error("Erreur lors de la consommation des messages Redis", e);
             // Ne pas arrêter le consommateur, il réessayera au prochain cycle
+        }
+    }
+
+    private void processBatch(ReadOffset offset) {
+        var messages = redisTemplate.opsForStream()
+                .read(Consumer.from(consumerGroup, consumerName),
+                      StreamReadOptions.empty().count(100),
+                      StreamOffset.create(streamName, offset));
+
+        if (messages != null && !messages.isEmpty()) {
+            for (MapRecord<String, Object, Object> message : messages) {
+                processMessage(message);
+            }
         }
     }
 
@@ -96,13 +105,19 @@ public class RedisStreamConsumer {
         RecordId messageId = message.getId();
         Map<Object, Object> fields = message.getValue();
 
+        // Message invalide : inutile de le retenter, on l'écarte (acquitté) en gardant une trace
+        EnergyMeasurement measurement;
+        try {
+            measurement = parseMeasurement(fields);
+        } catch (IllegalArgumentException | DateTimeException e) {
+            log.error("Message {} invalide, écarté définitivement : {}", messageId, e.getMessage());
+            redisTemplate.opsForStream().acknowledge(streamName, consumerGroup, messageId);
+            return;
+        }
+
         try {
             log.debug("Traitement du message Redis : {}", messageId);
 
-            // 1. Valider et convertir la mesure
-            EnergyMeasurement measurement = parseMeasurement(fields);
-
-            // 2. Enregistrer dans Cassandra
             cassandraMeasurementService.saveMeasurement(
                 measurement.sensorId(),
                 measurement.timestamp(),
@@ -113,17 +128,16 @@ public class RedisStreamConsumer {
                 measurement.temperature()
             );
 
-            log.info("Mesure persistée dans Cassandra : capteur={}, timestamp={}", 
+            log.info("Mesure persistée dans Cassandra : capteur={}, timestamp={}",
                     measurement.sensorId(), measurement.timestamp());
 
-            // 3. Acquitter le message Redis uniquement après persistance réussie
+            // Acquitter uniquement après persistance réussie
             redisTemplate.opsForStream().acknowledge(streamName, consumerGroup, messageId);
             log.debug("Message Redis acquitté : {}", messageId);
 
         } catch (Exception e) {
-            log.error("Erreur lors du traitement du message {}, ne sera pas acquitté et sera retraité", messageId, e);
-            // Ne pas acquitter le message en cas d'erreur
-            // Il sera retraité au prochain cycle
+            // Panne temporaire (Cassandra...) : pas d'ACK, le message sera relu au prochain cycle
+            log.error("Erreur lors du traitement du message {}, non acquitté, il sera relu", messageId, e);
         }
     }
 
