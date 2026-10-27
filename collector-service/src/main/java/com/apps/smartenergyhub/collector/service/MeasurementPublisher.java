@@ -1,6 +1,9 @@
 package com.apps.smartenergyhub.collector.service;
 
 import com.apps.smartenergyhub.collector.dto.EnergyMeasurementRequest;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -18,11 +21,21 @@ public class MeasurementPublisher {
 
     private final StringRedisTemplate redisTemplate;
     private final String streamName;
+    private final Counter accepted;
+    private final Timer publishTimer;
 
     public MeasurementPublisher(StringRedisTemplate redisTemplate,
-                                @Value("${app.redis.stream}") String streamName) {
+                                @Value("${app.redis.stream}") String streamName,
+                                MeterRegistry registry) {
         this.redisTemplate = redisTemplate;
         this.streamName = streamName;
+        this.accepted = Counter.builder("energy.measurements")
+                .tag("outcome", "accepted")
+                .description("Mesures traitées par le Collector, par résultat")
+                .register(registry);
+        this.publishTimer = Timer.builder("energy.measurements.publish")
+                .description("Temps de publication d'une mesure dans Redis")
+                .register(registry);
     }
 
     public RecordId publish(EnergyMeasurementRequest req) {
@@ -36,9 +49,10 @@ public class MeasurementPublisher {
         if (req.frequency() != null)   fields.put("frequency", String.valueOf(req.frequency()));
         if (req.temperature() != null) fields.put("temperature", String.valueOf(req.temperature()));
 
-        RecordId id = redisTemplate.opsForStream()
-                .add(StreamRecords.string(fields).withStreamKey(streamName));
+        RecordId id = publishTimer.record(() -> redisTemplate.opsForStream()
+                .add(StreamRecords.string(fields).withStreamKey(streamName)));
 
+        accepted.increment();
         log.info("Mesure publiée : capteur={}, id Redis={}", req.sensorId(), id);
         return id;
     }
