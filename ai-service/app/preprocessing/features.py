@@ -26,7 +26,22 @@ def to_hourly(measurements: List[Dict], sensor_id: str = None) -> pd.DataFrame:
     if sensor_id and "sensor_id" in df.columns:
         df = df[df["sensor_id"] == sensor_id].copy()
     
-    # Séparer sensor_id pour l'agrégation
+    # Si plusieurs capteurs, agréger par capteur
+    if "sensor_id" in df.columns and df["sensor_id"].nunique() > 1:
+        results = []
+        for sid in df["sensor_id"].unique():
+            df_sensor = df[df["sensor_id"] == sid].copy()
+            df_sensor = df_sensor.drop(columns=["sensor_id"])
+            result_sensor = (df_sensor.set_index("measured_at")[["power_kw", "voltage", "temperature"]]
+                           .resample("1h").mean()
+                           .interpolate(limit=2)
+                           .dropna())
+            result_sensor["sensor_id"] = sid
+            results.append(result_sensor)
+        result = pd.concat(results)
+        return result
+    
+    # Cas simple: un seul capteur ou pas de sensor_id
     sensor_id_col = None
     if "sensor_id" in df.columns:
         sensor_id_col = df["sensor_id"].iloc[0] if len(df) > 0 else None

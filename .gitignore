@@ -36,10 +36,10 @@ logs/
 Thumbs.db
 
 # AI Service
-# ai-service/artifacts/
-# ai-service/notebooks/
-# ai-service/data/raw/
-# ai-service/data/processed/
+ai-service/artifacts/
+ai-service/notebooks/
+ai-service/data/raw/
+ai-service/data/processed/
 
 # Maven wrapper (commented to keep in repo)
 # mvnw

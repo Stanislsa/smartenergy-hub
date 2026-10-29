@@ -87,6 +87,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ sensor_id: sensorId, horizon_minutes: horizonMinutes }),
     }),
+  forecastLSTM: (sensorId, horizonMinutes) =>
+    request('/ai/api/v1/lstm-forecasts/predict', {
+      method: 'POST',
+      body: JSON.stringify({ sensor_id: sensorId, horizon_minutes: horizonMinutes }),
+    }),
   modelStatus: () => request('/ai/api/v1/model/status'),
 
   // --- Santé des services ---

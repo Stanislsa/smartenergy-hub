@@ -1,5 +1,5 @@
 {
-  "version": "20261024_020211",
+  "version": "20261025_142533",
   "model_type": "IsolationForest",
   "features": [
     "power_kw",
@@ -7,5 +7,5 @@
     "temperature"
   ],
   "contamination": 0.1,
-  "trained_at": "2026-10-24T02:02:11.619739"
+  "trained_at": "2026-10-25T14:25:33.595353"
 }

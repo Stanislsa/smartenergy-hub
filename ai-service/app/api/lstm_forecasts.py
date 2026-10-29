@@ -51,9 +51,17 @@ async def predict_lstm_forecast(request: ForecastRequest):
         # Sélectionner les 168 dernières heures
         feature_cols = ['power_kw', 'voltage', 'temperature', 'hour', 'day_of_week', 'is_weekend', 'month']
         available_cols = [c for c in feature_cols if c in df_hourly.columns]
+        
+        # Remplir les valeurs manquantes pour voltage et temperature
+        for col in ['voltage', 'temperature']:
+            if col in df_hourly.columns:
+                df_hourly[col] = df_hourly[col].fillna(df_hourly[col].median())
+        
         features_array = df_hourly[available_cols].tail(hours_needed).values
         
         print(f"Features array shape: {features_array.shape}, Columns: {available_cols}")
+        print(f"Features array ndim: {features_array.ndim}")
+        print(f"Features array sample: {features_array[:2] if len(features_array) > 1 else features_array}")
         
         # Prédire avec le modèle spécifique au capteur
         prediction = lstm_service.predict(features_array, request.horizon_minutes, sensor_id=request.sensor_id)

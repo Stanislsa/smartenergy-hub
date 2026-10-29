@@ -54,13 +54,13 @@ class ForecastService:
         """
         measurements = self.cassandra.get_latest_measurements(sensor_id, hours)
         
-        if not measurements or len(measurements) < 24:
+        if not measurements or len(measurements) < 12:
             raise ValueError(f"Données insuffisantes pour {sensor_id} ({len(measurements)} h)")
         
         # Regrouper par heure avant de créer les lags
         df_hourly = to_hourly(measurements)
         
-        if len(df_hourly) < 24:
+        if len(df_hourly) < 12:
             raise ValueError(f"Données horaires insuffisantes pour {sensor_id} ({len(df_hourly)} h)")
         
         # Calculer les lags sur les données horaires
@@ -93,7 +93,7 @@ class ForecastService:
     
     def predict(self, features: np.ndarray, horizon_minutes: int = 60, sensor_id: str = None) -> Dict:
         """
-        Prédit la consommation future.
+        Prédit la consommation future en générant une série temporelle.
         
         Args:
             features: Features pour la prédiction
@@ -101,32 +101,47 @@ class ForecastService:
             sensor_id: Identifiant du capteur pour charger le bon modèle
         
         Returns:
-            Dictionnaire avec la prédiction et l'intervalle de confiance
+            Dictionnaire avec la série de prédictions et intervalles de confiance
         """
         if not self.is_loaded or (sensor_id and sensor_id != self.current_sensor_id):
             self.load_model(sensor_id)
         
-        features_scaled = self.scaler.transform(features)
-        prediction = self.model.predict(features_scaled)[0]
+        # Générer des prévisions par heure sur l'horizon demandé
+        forecast_hours = max(1, horizon_minutes // 60)
+        forecast_series = []
         
-        # Calculer l'intervalle de confiance depuis les arbres
-        predictions = [tree.predict(features_scaled) for tree in self.model.estimators_]
-        std_dev = np.std(predictions)
-        
-        confidence_interval = {
-            "lower": float(prediction - 1.96 * std_dev),
-            "upper": float(prediction + 1.96 * std_dev),
-            "std_dev": float(std_dev)
-        }
-        
-        expected_error = std_dev * 1.96
+        # Pour Random Forest, on prédit plusieurs points avec des features temporels différents
+        for hour in range(forecast_hours):
+            # Mettre à jour l'heure dans les features
+            current_features = features.copy()
+            current_hour = (current_features[0, 6] + hour) % 24  # hour
+            current_day = (current_features[0, 7] + (current_features[0, 6] + hour) // 24) % 7  # day_of_week
+            current_features[0, 6] = current_hour
+            current_features[0, 7] = current_day
+            current_features[0, 8] = 1 if current_day >= 5 else 0  # is_weekend
+            
+            features_scaled = self.scaler.transform(current_features)
+            prediction = self.model.predict(features_scaled)[0]
+            
+            # Calculer l'intervalle de confiance depuis les arbres
+            predictions = [tree.predict(features_scaled) for tree in self.model.estimators_]
+            std_dev = np.std(predictions)
+            
+            confidence_interval = {
+                "lower": float(prediction - 1.96 * std_dev),
+                "upper": float(prediction + 1.96 * std_dev),
+                "std_dev": float(std_dev)
+            }
+            
+            forecast_series.append({
+                "timestamp": (datetime.utcnow() + timedelta(hours=hour + 1)).isoformat() + "Z",
+                "predicted_power_kw": float(prediction),
+                "confidence_interval": confidence_interval
+            })
         
         return {
-            "predicted_power_kw": float(prediction),
-            "confidence_interval": confidence_interval,
-            "expected_error_kw": float(expected_error),
-            "horizon_minutes": horizon_minutes,
-            "forecast_time": datetime.utcnow() + timedelta(minutes=horizon_minutes)
+            "forecast_series": forecast_series,
+            "horizon_minutes": horizon_minutes
         }
     
     def predict_batch(self, features_list: List[np.ndarray], horizon_minutes: int = 60) -> List[Dict]:

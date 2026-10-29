@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.prediction import ForecastRequest, ForecastResponse
 from app.services.forecast_service import ForecastService
+from datetime import datetime
 import numpy as np
 
 router = APIRouter()
@@ -25,10 +26,9 @@ async def predict_forecast(request: ForecastRequest):
         
         return ForecastResponse(
             sensor_id=request.sensor_id,
-            forecast_time=prediction["forecast_time"],
+            forecast_start=datetime.utcnow(),
             horizon_minutes=request.horizon_minutes,
-            predicted_power_kw=prediction["predicted_power_kw"],
-            confidence_interval=prediction["confidence_interval"],
+            forecast_series=prediction["forecast_series"],
             model_version="forecast-v1"
         )
     except FileNotFoundError as e:

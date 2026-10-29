@@ -1,5 +1,5 @@
 {
-  "version": "20261024_020134",
+  "version": "20261029_104043",
   "sensor_id": "SENSOR-001",
   "model_type": "RandomForestRegressor",
   "features": [
@@ -18,5 +18,5 @@
   ],
   "n_estimators": 100,
   "max_depth": 10,
-  "trained_at": "2026-10-24T02:01:35.026833"
+  "trained_at": "2026-10-29T10:40:43.327069"
 }

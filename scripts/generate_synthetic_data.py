@@ -210,7 +210,7 @@ class SyntheticDataGenerator:
 
     def generate_all_sensors(
         self,
-        days: int = 7,
+        days: int = 10,
         interval_minutes: int = 5,
         anomaly_rate: float = 0.05,
         send_to_api: bool = False,
