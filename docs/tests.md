@@ -240,8 +240,8 @@ mais la lecture renvoie **une seule** mesure à 20:00:00Z. ✅
 
 | Service | Tests | Résultat |
 |---|---|---|
-| analytics-service | 65 (calculs, anomalies, lecture Cassandra, service, contrôleurs) | ✅ BUILD SUCCESS |
-| collector-service | 8 (validation du DTO, d'après la PR #10) | ⏳ à relancer |
+| analytics-service | 67 (calculs, anomalies, lecture Cassandra, résumés quotidiens, service, contrôleurs) | ✅ BUILD SUCCESS (24/10/2026, avec Actuator) |
+| collector-service | 11 (8 validation du DTO, 3 métriques `energy.measurements`) | ✅ BUILD SUCCESS (28/10/2026) |
 | storage-service | aucun (Maven : `No sources to compile` pour les tests) | — |
 
 ## 7. Observations
@@ -265,5 +265,5 @@ Cassandra ont été faites avec `docker compose exec` (XLEN, XINFO GROUPS, XPEND
    tant que Cassandra n'est pas disponible. Un `503` avec un message clair serait plus explicite.
 5. **Santé des conteneurs.** Après un redémarrage de Docker Desktop, Cassandra et MongoDB ont été affichés
    `unhealthy` alors qu'ils répondaient ; attendre que `cqlsh` réponde est plus fiable que l'état Docker.
-6. **Actuator.** Disponible sur le Collector (`/actuator/health` = `UP`), absent de l'Analytics (404) :
-   à ajouter avec le monitoring (Étape 11).
+6. **Actuator.** Disponible sur le Collector (`/actuator/health` = `UP`), absent de l'Analytics (404) le 24/10 :
+   ajouté à l'Analytics avec le monitoring (PR #17, voir `docs/monitoring.md`) ; toujours absent du Storage.
