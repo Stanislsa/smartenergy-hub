@@ -57,7 +57,7 @@ déclencher d'alertes sur les variations normales (sinus du simulateur).
 
 **Limites :**
 - σ = 0 (puissance constante) : z n'est pas défini, aucune anomalie n'est signalée ;
-- avec n mesures, |z| ≤ (n − 1)/√n : il faut **au moins 11 mesures** pour pouvoir dépasser 3 ;
+- avec n mesures (écart-type de la population), |z| ≤ √(n − 1) : il faut **au moins 11 mesures** pour pouvoir dépasser 3 ;
 - un pic très fort augmente lui-même µ et σ, ce qui peut masquer d'autres pics ;
 - une dérive lente de la consommation n'est pas détectée.
 
