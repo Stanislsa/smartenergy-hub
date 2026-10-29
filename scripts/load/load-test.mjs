@@ -10,6 +10,8 @@
 //   2. Redis      : lag et pending du groupe storage-group sur le flux energy-measurements
 //                   (redis-cli via docker compose) -> le Storage suit-il le débit ?
 //   3. JVM        : process.cpu.usage et jvm.memory.used du Collector et de l'Analytics (Actuator)
+//   4. Métier     : compteur energy.measurements (outcome accepted / rejected_* / error_redis) et durée
+//                   energy.measurements.publish (publication dans Redis) du Collector (Micrometer)
 //
 // Utilisation (depuis la racine du dépôt, services et Docker lancés) :
 //   node scripts/load/load-test.mjs
@@ -50,7 +52,7 @@ const pct = (list, p) => {
 // ---------- Relevés ----------
 async function redisGroup() {
   try {
-    const { stdout } = await run('docker', ['compose', 'exec', '-T', 'redis', 'redis-cli', 'XINFO', 'GROUPS', 'energy-measurements'])
+    const { stdout } = await run('docker', ['compose', '--profile', 'ai', 'exec', '-T', 'redis', 'redis-cli', 'XINFO', 'GROUPS', 'energy-measurements'])
     const lines = stdout.trim().split(/\r?\n/)
     const i = lines.indexOf('storage-group')
     if (i < 0) return null
@@ -102,6 +104,8 @@ console.log(`Actuator Analytics : ${actuatorAnalytics ? 'oui' : 'non (métriques
 const results = []
 for (const rate of STEPS) {
   const httpBefore = await metric(COLLECTOR, 'http.server.requests', 'uri:/api/measurements')
+  const acceptedBefore = await metric(COLLECTOR, 'energy.measurements', 'outcome:accepted')
+  const publishBefore = await metric(COLLECTOR, 'energy.measurements.publish')
   const lat = []
   const codes = {}
   const samples = []
@@ -164,6 +168,9 @@ for (const rate of STEPS) {
     }
   }
   const httpAfter = await metric(COLLECTOR, 'http.server.requests', 'uri:/api/measurements')
+  const acceptedAfter = await metric(COLLECTOR, 'energy.measurements', 'outcome:accepted')
+  const publishAfter = await metric(COLLECTOR, 'energy.measurements.publish')
+  const publishCount = publishAfter && publishBefore ? publishAfter.COUNT - publishBefore.COUNT : null
 
   const serverCount = httpAfter && httpBefore ? httpAfter.COUNT - httpBefore.COUNT : null
   const serverAvgMs = serverCount ? ((httpAfter.TOTAL_TIME - httpBefore.TOTAL_TIME) / serverCount) * 1000 : null
@@ -182,6 +189,9 @@ for (const rate of STEPS) {
     latMax: lat.length ? Math.max(...lat) : null,
     serverCount,
     serverAvgMs,
+    collectorAccepted: acceptedAfter && acceptedBefore ? acceptedAfter.COUNT - acceptedBefore.COUNT : null,
+    publishAvgMs: publishCount ? ((publishAfter.TOTAL_TIME - publishBefore.TOTAL_TIME) / publishCount) * 1000 : null,
+    publishMaxMs: publishAfter ? publishAfter.MAX * 1000 : null,
     lagMax: max((s) => s.g?.lag),
     lagEnd: gEnd?.lag ?? null,
     pendingMax: max((s) => s.g?.pending),
@@ -216,6 +226,12 @@ ${results
       `| ${r.rate}/s | ${fmt(r.achieved)}/s | ${r.accepted} / ${r.sent} | ${fmt(r.latAvg)} | ${fmt(r.latP95)} | ${fmt(r.latMax)} | ${r.serverCount ?? '—'} | ${fmt(r.serverAvgMs, 2)} | ${r.lagMax ?? '—'} | ${r.lagEnd ?? '—'} | ${r.drainSeconds == null ? 'non rattrapé' : fmt(r.drainSeconds) + ' s'} |`,
   )
   .join('\n')}
+
+## Métriques métier du Collector (Micrometer)
+
+| Débit visé | Envoyées | \`energy.measurements\` accepted | Publication Redis moy. (ms) | Publication Redis max (ms) |
+|---|---|---|---|---|
+${results.map((r) => `| ${r.rate}/s | ${r.sent} | ${r.collectorAccepted ?? '—'} | ${fmt(r.publishAvgMs, 2)} | ${fmt(r.publishMaxMs, 2)} |`).join('\n')}
 
 ## JVM (maximum relevé pendant l'envoi)
 
