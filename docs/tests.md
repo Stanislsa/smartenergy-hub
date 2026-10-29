@@ -13,7 +13,7 @@ de `docs/api-recomandation.md` (section 6). Responsable : partie D.
 | Services | Collector 8081 (Salomi), Storage 8082 (Stan), Analytics 8083 (Lalia, Tiana) |
 | Données de test | `scripts/test-data/` (mesures JSON et CQL) |
 | Capteur de test | `SENSOR-002` pour la chaîne complète, `SENSOR-001` pour le pic |
-| Date d'exécution | 22/10/2026 (n° 4), 24/10/2026 (autres scénarios), 27/10/2026 (C8 après correctif) |
+| Date d'exécution | 22/10/2026 (n° 4), 24/10/2026 (autres scénarios), 27/10/2026 (C8 après correctif), 29/10/2026 (I1) |
 
 Lancement des services, un terminal par service, depuis la racine du dépôt :
 
@@ -235,6 +235,43 @@ Attendu : `202`, XLEN +1, mais toujours **une seule** ligne à 20:00:00Z dans Ca
 
 Obtenu (24/10/2026) : `202`, deux logs `Mesure persistée` pour 20:00 (deux `RecordId` différents),
 mais la lecture renvoie **une seule** mesure à 20:00:00Z. ✅
+
+### I1 — Résumé quotidien : calcul, écriture MongoDB, lecture (sujet 22.2)
+
+Dans ce projet, le Storage écrit uniquement dans Cassandra ; les agrégats MongoDB (`daily_summaries`) sont calculés
+et enregistrés par analytics-service à partir des mesures Cassandra.
+
+```cmd
+curl "http://localhost:8083/api/sensors/SENSOR-001/daily-summary?date=2026-10-22"
+curl -X POST "http://localhost:8083/api/sensors/SENSOR-001/daily-summary/compute?date=2026-10-22"
+curl "http://localhost:8083/api/sensors/SENSOR-001/daily-summary?date=2026-10-22"
+curl "http://localhost:8083/api/analytics/SENSOR-001/summary?from=2026-10-22T00:00:00Z&to=2026-10-23T00:00:00Z"
+```
+
+Attendu : 404 avant le calcul, puis un résumé enregistré dans MongoDB, relu à l'identique et cohérent avec l'analyse
+de la même journée.
+
+Obtenu (29/10/2026) :
+
+| Étape | Résultat |
+|---|---|
+| Lecture avant calcul | `404` « Aucun résumé quotidien pour SENSOR-001 le 2026-10-22 » |
+| `POST .../daily-summary/compute` | `200` : avgPowerKw 3,8, maxPowerKw 12,5, energyKwh 25,91, anomalyCount 1 |
+| Relecture `GET .../daily-summary` | `200`, valeurs identiques |
+| Contrôle `GET /api/analytics/.../summary` (30 mesures) | moyenne 3,802, max 12,5, énergie 25,912 kWh ; 1 instant anormal (seuil, z-score et variation au même instant) |
+| Second calcul | mêmes valeurs, toujours un seul résumé pour ce jour (rejouable) |
+
+✅
+
+### Couverture des tests d'intégration (sujet 22.2)
+
+| Chemin | Couvert par |
+|---|---|
+| API → Redis | n° 1 (`202` + XLEN), n° 2 (rien publié si invalide) |
+| Redis → Storage Service | n° 1, n° 5, n° 6, P2 (C3, C6, C8) |
+| Storage Service → Cassandra | n° 1, n° 6, P1, P3 (C4, C9) |
+| Stockage → MongoDB | I1 (agrégats écrits par analytics-service ; capteurs : `scripts/init-mongo.js`) |
+| Lecture via API | n° 3, n° 4, I1 |
 
 ## 6. Tests unitaires
 
