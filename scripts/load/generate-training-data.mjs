@@ -21,6 +21,7 @@
 import { mkdirSync, createWriteStream } from 'node:fs'
 import { join } from 'node:path'
 import { generateMeasurement } from './profile.mjs'
+import { authHeaders } from './auth.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, all) => {
@@ -52,7 +53,7 @@ if (args.sensors) {
   })
 } else {
   try {
-    const res = await fetch(`${ANALYTICS}/api/sensors`)
+    const res = await fetch(`${ANALYTICS}/api/sensors`, { headers: await authHeaders(ANALYTICS) })
     if (!res.ok) exit(`GET /api/sensors a répondu ${res.status}`)
     sensors = (await res.json()).filter((s) => s.maxPowerKw > 0)
   } catch (e) {

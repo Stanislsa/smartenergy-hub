@@ -146,6 +146,12 @@ services:
       SPRING_CASSANDRA_CONTACT_POINTS: cassandra
       SPRING_CASSANDRA_PORT: 9042
       JAVA_TOOL_OPTIONS: -Xmx384m
+      APP_SECURITY_ENABLED: ${APP_SECURITY_ENABLED:-false}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-}
+      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-}
+      APP_VIEWER_USERNAME: ${APP_VIEWER_USERNAME:-}
+      APP_VIEWER_PASSWORD: ${APP_VIEWER_PASSWORD:-}
     depends_on:
       mongo-init:
         condition: service_completed_successfully

@@ -4,7 +4,7 @@
 // fréquence 50 Hz ± 0,05 ; température 26 °C ± 1,5.
 // Anomalies optionnelles : pic de puissance (1,2 à 1,6 × maxPowerKw, température + 6 °C)
 // ou chute de tension (195 à 205 V).
-
+import { authHeaders } from './auth.mjs'
 const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d
 const noise = (amplitude) => (Math.random() * 2 - 1) * amplitude
 
