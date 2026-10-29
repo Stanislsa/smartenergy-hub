@@ -16,14 +16,14 @@ Légende : ✅ oui, ⚠️ oui avec réserve, ❌ non, ⏳ à vérifier.
 | 9 | L'API permet-elle de lire l'historique ? | ✅ | `GET /api/measurements/{sensorId}?from&to` (Analytics) ; `docs/tests.md` n° 3 : liste ordonnée, plus récente d'abord ; écran Historique du front | — |
 | 10 | Les résultats analytiques sont-ils vérifiables ? | ✅ | `docs/tests.md` n° 4 : pic de 12,5 kW, valeurs attendues calculées à la main puis obtenues (moyenne, énergie, z = 4,79, +247 %) ; formules et limites dans `docs/analytics.md` ; 67 tests unitaires | — |
 | 11 | Les principaux scénarios de panne ont-ils été testés ? | ✅ | `docs/tests.md` : arrêt du Storage (n° 5, n° 6), panne de Cassandra (P2, C7, C8 validé après correctif le 27/10), redémarrage complet (P1) ; montée en charge jusqu'à 100 mesures/s (`docs/monitoring.md`) | — |
-| 12 | Les secrets sont-ils absents du dépôt ? | ⚠️ | Aucun mot de passe ni clé trouvé dans le code et la configuration (bases sans authentification en local ; `ai-service/.env.example` sans valeur ; `.env` ignoré par Git). Mais aucune **note de sécurité** (Étape 12, livrable obligatoire) | Rédiger la note de sécurité (secrets, ports exposés, validation, profils) |
+| 12 | Les secrets sont-ils absents du dépôt ? | ✅ | Aucun mot de passe, jeton ou clé dans le code, la configuration ni l'historique Git complet (vérifié le 29/10) ; `.env` ignoré par Git ; note de sécurité : `docs/securite.md` (secrets à protéger, accès exposés, mécanismes, risques) | Appliquer en production les recommandations de `docs/securite.md` §5 |
 | 13 | Swagger est-il accessible ? | ✅ | Vérifié le 29/10 : Collector `http://localhost:8081/swagger-ui.html` (3 endpoints), Storage `http://localhost:8082/swagger-ui/index.html` (5), Analytics `http://localhost:8083/swagger-ui/index.html` (11) ; contrats OpenAPI 3 sur `/v3/api-docs` | Ajouter l'URL du Storage au README |
 | 14 | Le groupe sait-il expliquer ses choix sans lire le rapport ? | ⏳ | Non vérifiable par le dépôt | Répétition de la soutenance : chacun présente l'architecture complète, pas seulement sa partie (sujet §24) |
 
 ## Synthèse
 
-- ✅ 9 questions (1, 5, 6, 7, 8, 9, 10, 11, 13) ; ⚠️ 3 (3, 4, 12) ; ❌ 1 (2) ; ⏳ 1 (14).
-- **À compléter avant la remise** : README (2), simulateur (4), note de sécurité (12), répétition orale (14).
+- ✅ 10 questions (1, 5, 6, 7, 8, 9, 10, 11, 12, 13) ; ⚠️ 2 (3, 4) ; ❌ 1 (2) ; ⏳ 1 (14).
+- **À compléter avant la remise** : README (2), simulateur (4), répétition orale (14).
 
 ## Autres points relevés pendant la vérification
 
@@ -32,4 +32,4 @@ Légende : ✅ oui, ⚠️ oui avec réserve, ❌ non, ⏳ à vérifier.
 - storage-service n'a aucun test unitaire ; son débit plafonne vers 65-70 mesures/s depuis le correctif C8
   (`docs/monitoring.md`, point 7).
 - Les ports des bases (27018, 6380, 9042) sont exposés par `docker-compose.yml` : normal en développement, à signaler
-  dans la note de sécurité (sujet, Étape 12 : « ne pas exposer inutilement les ports des bases en production »).
+  dans la note de sécurité (`docs/securite.md`, sujet Étape 12 : « ne pas exposer inutilement les ports des bases en production »).
