@@ -34,6 +34,9 @@ public class RedisStreamConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(RedisStreamConsumer.class);
 
+    /** Taille maximale d'un lot lu dans Redis ; le flux est vidé lot par lot à chaque cycle. */
+    private static final int BATCH_SIZE = 100;
+
     private final StringRedisTemplate redisTemplate;
     private final CassandraMeasurementService cassandraMeasurementService;
     private final String streamName;
@@ -69,12 +72,13 @@ public class RedisStreamConsumer {
 
     /**
      * Traite les messages du flux Redis de manière planifiée.
-     * Cette méthode est appelée périodiquement pour lire les nouveaux messages.
+     * Les messages en attente sont relus d'abord, puis le flux est vidé lot par lot
+     * avant d'attendre le cycle suivant (sinon le débit serait plafonné à un lot par cycle).
      */
     @Scheduled(fixedDelay = 1000) // Vérifie toutes les secondes
     public void consumeMessages() {
         try {
-            // 1. D'abord les messages déjà lus par ce consommateur mais jamais acquittés
+            // 1. D'abord les messages déjà lus par ce consumer mais jamais acquittés
             processBatch(ReadOffset.from("0"));
             // 2. Ensuite les nouveaux messages : on vide le flux avant d'attendre le cycle suivant
             int lus;
@@ -195,6 +199,4 @@ public class RedisStreamConsumer {
             Double frequency,
             Double temperature
     ) {}
-
-    private static final int BATCH_SIZE = 100;
 }
