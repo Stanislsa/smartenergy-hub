@@ -74,27 +74,32 @@ public class RedisStreamConsumer {
     @Scheduled(fixedDelay = 1000) // Vérifie toutes les secondes
     public void consumeMessages() {
         try {
-            // 1. D'abord les messages déjà lus par ce consumer mais jamais acquittés
+            // 1. D'abord les messages déjà lus par ce consommateur mais jamais acquittés
             processBatch(ReadOffset.from("0"));
-            // 2. Ensuite les nouveaux messages
-            processBatch(ReadOffset.lastConsumed());
+            // 2. Ensuite les nouveaux messages : on vide le flux avant d'attendre le cycle suivant
+            int lus;
+            do {
+                lus = processBatch(ReadOffset.lastConsumed());
+            } while (lus >= BATCH_SIZE);
         } catch (Exception e) {
             log.error("Erreur lors de la consommation des messages Redis", e);
             // Ne pas arrêter le consommateur, il réessayera au prochain cycle
         }
     }
 
-    private void processBatch(ReadOffset offset) {
+    private int processBatch(ReadOffset offset) {
         var messages = redisTemplate.opsForStream()
                 .read(Consumer.from(consumerGroup, consumerName),
-                      StreamReadOptions.empty().count(100),
+                      StreamReadOptions.empty().count(BATCH_SIZE),
                       StreamOffset.create(streamName, offset));
 
-        if (messages != null && !messages.isEmpty()) {
-            for (MapRecord<String, Object, Object> message : messages) {
-                processMessage(message);
-            }
+        if (messages == null || messages.isEmpty()) {
+            return 0;
         }
+        for (MapRecord<String, Object, Object> message : messages) {
+            processMessage(message);
+        }
+        return messages.size();
     }
 
     /**
@@ -190,4 +195,6 @@ public class RedisStreamConsumer {
             Double frequency,
             Double temperature
     ) {}
+
+    private static final int BATCH_SIZE = 100;
 }
