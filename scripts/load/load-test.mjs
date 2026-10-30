@@ -25,6 +25,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { promisify } from 'node:util'
 import { generateMeasurement } from './profile.mjs'
+import { authHeaders } from './auth.mjs'
 
 const run = promisify(execFile)
 
@@ -86,7 +87,7 @@ async function jvm(base) {
 // ---------- Programme ----------
 let sensors
 try {
-  sensors = (await (await fetch(`${ANALYTICS}/api/sensors?active=true`)).json()).filter((s) => s.active && s.maxPowerKw > 0)
+  sensors = (await (await fetch(`${ANALYTICS}/api/sensors?active=true`, { headers: await authHeaders(ANALYTICS) })).json()).filter((s) => s.active && s.maxPowerKw > 0)
 } catch (e) {
   console.error(`Erreur : analytics-service injoignable (${ANALYTICS}) : ${e.cause?.code || e.message}`)
   process.exit(1)
