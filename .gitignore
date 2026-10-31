@@ -44,3 +44,9 @@ Thumbs.db
 # Maven wrapper (commented to keep in repo)
 # mvnw
 # mvnw.cmd
+
+# IDE Eclipse / STS
+.classpath
+.factorypath
+.project
+.settings/

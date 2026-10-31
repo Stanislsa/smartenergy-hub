@@ -6,3 +6,5 @@
 .classpath
 .project
 ai-service
+**/node_modules
+frontend
