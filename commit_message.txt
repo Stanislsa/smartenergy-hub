@@ -1,0 +1,11 @@
+Corriger les services de prévision IA et entraîner les modèles Random Forest
+
+- Générer 10 jours de données synthétiques pour tous les capteurs (8640 mesures)
+- Injecter les données dans Cassandra pour les prévisions LSTM (besoin de 168h)
+- Entraîner les modèles Random Forest pour SENSOR-001, SENSOR-002, SENSOR-003
+- Corriger la sérialisation du timestamp dans forecast_service.py
+- Ajouter des scripts d'injection de données pour Cassandra
+- Mettre à jour le générateur de données synthétiques par défaut à 10 jours
+- Corriger le chemin de l'endpoint LSTM
+- Tous les services actifs : frontend, collector, storage, analytics, AI
+- Les deux endpoints de prévision fonctionnent : LSTM et Random Forest

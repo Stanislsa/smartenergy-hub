@@ -142,7 +142,10 @@ class LSTMForecastTrainer:
         mae = mean_absolute_error(y_test_denorm, y_pred_denorm)
         rmse = np.sqrt(mean_squared_error(y_test_denorm, y_pred_denorm))
         r2 = r2_score(y_test_denorm, y_pred_denorm)
-        mape = np.mean(np.abs((y_test_denorm - y_pred_denorm) / y_test_denorm)) * 100
+        non_zero_targets = y_test_denorm != 0
+        mape = (np.mean(np.abs((y_test_denorm[non_zero_targets] - y_pred_denorm[non_zero_targets])
+                              / y_test_denorm[non_zero_targets])) * 100
+                if non_zero_targets.any() else 0.0)
         
         print(f"\n=== Résultats d'évaluation LSTM ===")
         print(f"MAE: {mae:.4f} kW")
@@ -152,7 +155,8 @@ class LSTMForecastTrainer:
         
         return {"mae": float(mae), "rmse": float(rmse), "r2": float(r2), "mape": float(mape)}
     
-    def save_model(self, output_dir: str = "artifacts/lstm_forecast_model", sensor_id: str = None):
+    def save_model(self, output_dir: str = "artifacts/lstm_forecast_model", sensor_id: str = None,
+                   metrics: dict = None, test_samples: int = 0):
         """Sauvegarde le modèle LSTM et le scaler"""
         os.makedirs(output_dir, exist_ok=True)
         
@@ -179,7 +183,9 @@ class LSTMForecastTrainer:
             "model_type": "LSTM",
             "features": self.features,
             "sequence_length": self.sequence_length,
-            "trained_at": datetime.now().isoformat()
+            "trained_at": datetime.now().astimezone().isoformat(),
+            "test_samples": test_samples,
+            "metrics": metrics or {}
         }
         
         metadata_path = os.path.join(output_dir, f"lstm_metadata{sensor_suffix}.json")
@@ -215,11 +221,11 @@ if __name__ == "__main__":
             X_train, X_test, y_train, y_test = trainer.preprocess_data(df_sensor)
             trainer.train_model(X_train, y_train)
             metrics = trainer.evaluate_model(X_test, y_test)
-            trainer.save_model(sensor_id=sensor_id)
+            trainer.save_model(sensor_id=sensor_id, metrics=metrics, test_samples=len(y_test))
     else:
         # Entraînement global (sans sensor_id)
         df = trainer.create_temporal_features(df)
         X_train, X_test, y_train, y_test = trainer.preprocess_data(df)
         trainer.train_model(X_train, y_train)
         metrics = trainer.evaluate_model(X_test, y_test)
-        trainer.save_model()
+        trainer.save_model(metrics=metrics, test_samples=len(y_test))

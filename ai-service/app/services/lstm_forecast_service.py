@@ -3,8 +3,9 @@ from sklearn.preprocessing import MinMaxScaler
 import joblib
 import numpy as np
 import os
+import json
 from typing import Optional, List, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # TensorFlow est optionnel
 try:
@@ -22,6 +23,8 @@ class LSTMForecastService:
         self.scaler: Optional[MinMaxScaler] = None
         self.is_loaded = False
         self.current_sensor_id: Optional[str] = None
+        self.model_path: Optional[str] = None
+        self.model_metadata: Dict = {}
         self.sequence_length = 168  # 7 jours de contexte
     
     def load_model(self, sensor_id: str = None):
@@ -38,6 +41,15 @@ class LSTMForecastService:
         
         self.model = load_model(model_path)
         self.scaler = joblib.load(scaler_path)
+        self.model_path = model_path
+        metadata_path = f"artifacts/lstm_forecast_model/lstm_metadata{sensor_suffix}.json"
+        self.model_metadata = {}
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, encoding="utf-8") as metadata_file:
+                    self.model_metadata = json.load(metadata_file)
+            except (OSError, json.JSONDecodeError):
+                self.model_metadata = {}
         self.is_loaded = True
         self.current_sensor_id = sensor_id
         print(f"Modèle LSTM chargé: {model_path}")
@@ -73,8 +85,9 @@ class LSTMForecastService:
         features_scaled = self.scaler.transform(features)
         
         # Générer des prévisions par heure sur l'horizon demandé
-        forecast_hours = max(1, horizon_minutes // 60)
+        forecast_hours = max(1, (horizon_minutes + 59) // 60)
         forecast_series = []
+        forecast_start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
         current_sequence = features_scaled[-self.sequence_length:].copy()
         
         for hour in range(forecast_hours):
@@ -99,8 +112,8 @@ class LSTMForecastService:
             }
             
             forecast_series.append({
-                "timestamp": datetime.utcnow() + timedelta(hours=hour + 1),
-                "predicted_power_kw": float(prediction_denorm),
+                "timestamp": forecast_start + timedelta(hours=hour + 1),
+                "predicted_power_kw": float(max(0.0, prediction_denorm)),
                 "confidence_interval": confidence_interval
             })
             
@@ -124,8 +137,10 @@ class LSTMForecastService:
             predictions.append(pred)
         return predictions
     
-    def get_model_info(self) -> Dict:
+    def get_model_info(self, sensor_id: str = None) -> Dict:
         """Retourne les informations du modèle LSTM."""
+        if not self.is_loaded or (sensor_id and sensor_id != self.current_sensor_id):
+            self.load_model(sensor_id)
         if not self.is_loaded:
             return {"status": "not_loaded", "message": "Modèle LSTM non chargé"}
         
@@ -134,5 +149,8 @@ class LSTMForecastService:
             "model_type": "LSTM",
             "sequence_length": self.sequence_length,
             "model_path": self.model_path,
-            "loaded_at": datetime.utcnow().isoformat()
+            "version": self.model_metadata.get("version", "lstm-v1"),
+            "trained_at": self.model_metadata.get("trained_at"),
+            "metrics": self.model_metadata.get("metrics", {}),
+            "loaded_at": datetime.now(timezone.utc).isoformat()
         }

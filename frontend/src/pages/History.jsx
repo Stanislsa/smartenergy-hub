@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, ArrowDown, ArrowUp, List, RefreshCw, RotateCcw } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, Download, List, Printer, RefreshCw, RotateCcw } from 'lucide-react';
 import { api } from '../api/client';
 import {
   Card,
@@ -25,7 +25,7 @@ import {
 } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 import FilterBar from '../components/FilterBar';
-import { dateTime, daysAgoIso, daysRange, num, todayIso, timeShort } from '../utils';
+import { dateTime, daysAgoIso, daysRange, downloadCsv, num, todayIso, timeShort } from '../utils';
 
 const METRICS = [
   { key: 'powerKw', label: 'Puissance (kW)', color: '#2563eb', digits: 2 },
@@ -50,10 +50,10 @@ export default function History() {
   });
 
   const [filters, setFilters] = useState({
-    sensorId: params.get('sensor') || '',
-    start: daysAgoIso(6),
-    end: todayIso(),
-    metric: 'all',
+    sensorId: params.get('sensor') || (() => { try { return JSON.parse(localStorage.getItem('smartenergy.history-filters') || '{}').sensorId || ''; } catch { return ''; } })(),
+    start: (() => { try { return JSON.parse(localStorage.getItem('smartenergy.history-filters') || '{}').start || daysAgoIso(6); } catch { return daysAgoIso(6); } })(),
+    end: (() => { try { return JSON.parse(localStorage.getItem('smartenergy.history-filters') || '{}').end || todayIso(); } catch { return todayIso(); } })(),
+    metric: (() => { try { return JSON.parse(localStorage.getItem('smartenergy.history-filters') || '{}').metric || 'all'; } catch { return 'all'; } })(),
   });
   const [applied, setApplied] = useState(null);
   const [formError, setFormError] = useState(null);
@@ -95,6 +95,7 @@ export default function History() {
       return setFormError('La période ne peut pas dépasser 31 jours (limite de l’API).');
     setFormError(null);
     setApplied({ ...filters });
+    localStorage.setItem('smartenergy.history-filters', JSON.stringify(filters));
     setPage(1);
   };
 
@@ -107,6 +108,7 @@ export default function History() {
     };
     setFilters(defaultFilters);
     setApplied(defaultFilters);
+    localStorage.removeItem('smartenergy.history-filters');
     setPage(1);
   };
 
@@ -162,9 +164,11 @@ export default function History() {
         title="Historique des mesures"
         subtitle="Évolution des mesures par capteur et par période (Cassandra)"
         actions={
-          <button className="icon-btn" onClick={() => refetch()} title="Actualiser">
-            <RefreshCw size={18} />
-          </button>
+          <>
+            <button className="btn ghost sm" disabled={!historyData?.length} onClick={() => downloadCsv(`mesures-${applied?.sensorId || 'capteur'}.csv`, (historyData || []).map(row => ({ date: row.timestamp, capteur: row.sensorId, puissance_kW: row.powerKw, tension_V: row.voltage, courant_A: row.current, frequence_Hz: row.frequency, temperature_C: row.temperature })))}><Download size={14} /> CSV</button>
+            <button className="btn ghost sm" onClick={() => window.print()}><Printer size={14} /> PDF</button>
+            <button className="icon-btn" onClick={() => refetch()} title="Actualiser"><RefreshCw size={18} /></button>
+          </>
         }
         isFetching={isFetching}
       >

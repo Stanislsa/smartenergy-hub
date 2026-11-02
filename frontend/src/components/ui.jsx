@@ -41,7 +41,8 @@ export function Kpi({ icon: Icon, color = 'blue', label, value, unit, sub, child
 export function PageHead({ title, subtitle, children, actions, isFetching = false }) {
   return (
     <div className="page-head">
-      <div>
+      <div className="page-title-wrap">
+        <span className="page-eyebrow">SMARTENERGY HUB <i /> ESPACE DE TRAVAIL</span>
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
       </div>

@@ -35,7 +35,7 @@ def to_hourly(measurements: List[Dict], sensor_id: str = None) -> pd.DataFrame:
             result_sensor = (df_sensor.set_index("measured_at")[["power_kw", "voltage", "temperature"]]
                            .resample("1h").mean()
                            .interpolate(limit=2)
-                           .dropna())
+                           .dropna(subset=["power_kw"]))
             result_sensor["sensor_id"] = sid
             results.append(result_sensor)
         result = pd.concat(results)
@@ -51,7 +51,7 @@ def to_hourly(measurements: List[Dict], sensor_id: str = None) -> pd.DataFrame:
     result = (df.set_index("measured_at")[["power_kw", "voltage", "temperature"]]
               .resample("1h").mean()
               .interpolate(limit=2)
-              .dropna())
+              .dropna(subset=["power_kw"]))
     
     # Réajouter sensor_id si présent
     if sensor_id_col is not None:

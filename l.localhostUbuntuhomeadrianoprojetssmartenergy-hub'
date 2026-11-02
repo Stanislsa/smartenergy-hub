@@ -1,24 +1,31 @@
-[1mdiff --git a/storage-service/pom.xml b/storage-service/pom.xml[m
-[1mindex 3eb5b8b..338643c 100644[m
-[1m--- a/storage-service/pom.xml[m
-[1m+++ b/storage-service/pom.xml[m
-[36m@@ -50,6 +50,19 @@[m
-                 <groupId>org.springframework.boot</groupId>[m
-                 <artifactId>spring-boot-maven-plugin</artifactId>[m
-             </plugin>[m
-[32m+[m[32m            <plugin>[m
-[32m+[m[32m                <groupId>org.apache.maven.plugins</groupId>[m
-[32m+[m[32m                <artifactId>maven-compiler-plugin</artifactId>[m
-[32m+[m[32m                <configuration>[m
-[32m+[m[32m                    <annotationProcessorPaths>[m
-[32m+[m[32m                        <path>[m
-[32m+[m[32m                            <groupId>org.projectlombok</groupId>[m
-[32m+[m[32m                            <artifactId>lombok</artifactId>[m
-[32m+[m[32m                            <version>${lombok.version}</version>[m
-[32m+[m[32m                        </path>[m
-[32m+[m[32m                    </annotationProcessorPaths>[m
-[32m+[m[32m                </configuration>[m
-[32m+[m[32m            </plugin>[m
-         </plugins>[m
-     </build>[m
- [m
+.gitignore
+AUDIT_RAPPORT.md
+ai-service/.gitignore
+ai-service/app/api/forecasts.py
+ai-service/app/api/lstm_forecasts.py
+ai-service/app/preprocessing/features.py
+ai-service/app/schemas/prediction.py
+ai-service/app/services/forecast_service.py
+ai-service/app/services/lstm_forecast_service.py
+ai-service/artifacts/anomaly_detector/metadata.json
+ai-service/artifacts/forecast_model/forecast_metadata_SENSOR-001.json
+ai-service/convert_data.py
+ai-service/data/synthetic_data.json
+ai-service/training/convert_json_to_csv.py
+ai-service/training/test_forecast.py
+docker-compose.yml
+frontend/Dockerfile
+frontend/nginx.conf
+frontend/src/api/client.js
+frontend/src/pages/Forecast.jsx
+scripts/check_sensor_data.py
+scripts/convert_to_csv.py
+scripts/generate_synthetic_data.py
+scripts/inject_3sensors.py
+scripts/inject_cassandra.py
+scripts/synthetic_data.json
+scripts/test_anomaly.json
+scripts/test_forecast.json
+scripts/test_forecast_sensors.py
+scripts/test_lstm.json
+scripts/test_lstm_sensors.py

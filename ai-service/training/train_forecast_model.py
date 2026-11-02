@@ -74,7 +74,8 @@ class ForecastModelTrainer:
         df['month'] = df['measured_at'].dt.month
         
         # Supprimer les NaN créés par les lags
-        df = df.dropna()
+        required = [f"power_kw_lag_{lag}" for lag in [1, 2, 3, 6, 12, 24]] + ["power_kw"]
+        df = df.dropna(subset=required)
         
         print(f"Features créées: {len(df)} lignes après création de lags")
         return df
@@ -146,7 +147,10 @@ class ForecastModelTrainer:
         mae = mean_absolute_error(y_test, y_pred)
         rmse = np.sqrt(mean_squared_error(y_test, y_pred))
         r2 = r2_score(y_test, y_pred)
-        mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
+        non_zero_targets = np.asarray(y_test) != 0
+        mape = (np.mean(np.abs((np.asarray(y_test)[non_zero_targets] - y_pred[non_zero_targets])
+                              / np.asarray(y_test)[non_zero_targets])) * 100
+                if non_zero_targets.any() else 0.0)
         
         print(f"\n=== Résultats d'évaluation ===")
         print(f"MAE: {mae:.4f} kW")
@@ -161,7 +165,8 @@ class ForecastModelTrainer:
             "mape": float(mape)
         }
     
-    def save_model(self, output_dir: str = "artifacts/forecast_model", sensor_id: str = None):
+    def save_model(self, output_dir: str = "artifacts/forecast_model", sensor_id: str = None,
+                   metrics: dict = None, test_samples: int = 0):
         """Sauvegarde le modèle et le scaler"""
         os.makedirs(output_dir, exist_ok=True)
         
@@ -190,7 +195,9 @@ class ForecastModelTrainer:
             "features": self.features,
             "n_estimators": 100,
             "max_depth": 10,
-            "trained_at": datetime.now().isoformat()
+            "trained_at": datetime.now().astimezone().isoformat(),
+            "test_samples": test_samples,
+            "metrics": metrics or {}
         }
         
         metadata_path = os.path.join(output_dir, f"forecast_metadata{sensor_suffix}.json")
@@ -225,11 +232,11 @@ if __name__ == "__main__":
             X_train, X_test, y_train, y_test = trainer.preprocess_data(df_sensor)
             trainer.train_model(X_train, y_train)
             metrics = trainer.evaluate_model(X_test, y_test)
-            trainer.save_model(sensor_id=sensor_id)
+            trainer.save_model(sensor_id=sensor_id, metrics=metrics, test_samples=len(y_test))
     else:
         # Entraînement global (sans sensor_id)
         df = trainer.create_lag_features(df)
         X_train, X_test, y_train, y_test = trainer.preprocess_data(df)
         trainer.train_model(X_train, y_train)
         metrics = trainer.evaluate_model(X_test, y_test)
-        trainer.save_model()
+        trainer.save_model(metrics=metrics, test_samples=len(y_test))

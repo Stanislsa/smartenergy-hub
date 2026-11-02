@@ -40,18 +40,35 @@ export async function checkServices() {
   };
 }
 
-export function useServices(intervalMs = 30000) {
+export function useServices(intervalMs) {
+  const [configuredInterval, setConfiguredInterval] = useState(() => {
+    try {
+      const preferences = JSON.parse(localStorage.getItem('smartenergy.preferences') || '{}');
+      return Number(preferences.refreshSeconds || 30) * 1000;
+    } catch {
+      return 30000;
+    }
+  });
   const [state, setState] = useState(null);
+  const effectiveInterval = intervalMs ?? configuredInterval;
+  useEffect(() => {
+    const syncInterval = event => {
+      const seconds = event.detail?.refreshSeconds;
+      if (seconds) setConfiguredInterval(Number(seconds) * 1000);
+    };
+    window.addEventListener('smartenergy:preferences-changed', syncInterval);
+    return () => window.removeEventListener('smartenergy:preferences-changed', syncInterval);
+  }, []);
   useEffect(() => {
     let alive = true;
     const tick = () => checkServices().then(s => alive && setState(s));
     tick();
-    const id = setInterval(tick, intervalMs);
+    const id = setInterval(tick, effectiveInterval);
     return () => {
       alive = false;
       clearInterval(id);
     };
-  }, [intervalMs]);
+  }, [effectiveInterval]);
   return state;
 }
 

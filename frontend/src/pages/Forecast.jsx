@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Area,
@@ -58,10 +58,23 @@ export default function Forecast() {
 
   const [sensorId, setSensorId] = useState('');
   const [horizon, setHorizon] = useState(360);
-  const [model, setModel] = useState('rf');
+  const [model, setModel] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('smartenergy.preferences') || '{}').forecastModel || 'rf';
+    } catch {
+      return 'rf';
+    }
+  });
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
   const [generatedAt, setGeneratedAt] = useState(null);
+
+  const forecastModelQuery = useQuery({
+    queryKey: ['forecast-model-info', sensorId, model],
+    queryFn: () => api.forecastInfo(sensorId, model),
+    enabled: Boolean(sensorId),
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     if (sensorsData && !sensorId) setSensorId(sensorsData[0]?.sensorId || '');
@@ -265,6 +278,20 @@ export default function Forecast() {
         </Card>
 
         <div className="stack">
+          <Card title="Modèle de prévision sélectionné" icon={Brain}>
+            {forecastModelQuery.isLoading && <div className="state muted">Chargement des métadonnées…</div>}
+            {forecastModelQuery.error && <div className="model-info-unavailable">Aucun modèle entraîné n’est disponible pour ce capteur et ce choix.</div>}
+            {forecastModelQuery.data && (
+              <dl className="kv">
+                <dt>État</dt><dd>{forecastModelQuery.data.status === 'loaded' ? 'Disponible' : 'Indisponible'}</dd>
+                <dt>Version</dt><dd>{forecastModelQuery.data.version || '—'}</dd>
+                <dt>Entraîné le</dt><dd>{forecastModelQuery.data.trained_at ? new Date(forecastModelQuery.data.trained_at).toLocaleString('fr-FR') : '—'}</dd>
+                <dt>Échantillons de test</dt><dd>{forecastModelQuery.data.test_samples ?? '—'}</dd>
+                {Object.entries(forecastModelQuery.data.metrics || {}).map(([key, value]) => <Fragment key={key}><dt>{key.toUpperCase()}</dt><dd>{num(value, 3)}</dd></Fragment>)}
+              </dl>
+            )}
+            <p className="hint">MAE et RMSE mesurent l’erreur de prévision; R² indique la part de variation expliquée par le modèle.</p>
+          </Card>
           <Card title="Résultats de la prévision" icon={Info}>
             {!result?.forecast && <EmptyState icon="info" title="Pas encore de prévision" description="Générez une prévision pour voir les résultats." />}
             {result?.forecast && (

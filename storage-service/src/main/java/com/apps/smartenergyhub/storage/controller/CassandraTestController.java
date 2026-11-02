@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -63,7 +64,7 @@ public class CassandraTestController {
             @PathVariable @Parameter(description = "Identifiant du capteur") String sensorId,
             @RequestParam(required = false) @Parameter(description = "Date de la journée (format ISO)") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
         
-        LocalDate targetDay = (day != null) ? day : LocalDate.now();
+        LocalDate targetDay = (day != null) ? day : LocalDate.now(ZoneOffset.UTC);
         List<MeasurementEntity> measurements = 
             cassandraMeasurementService.getMeasurementsByDay(sensorId, targetDay);
         
@@ -75,7 +76,7 @@ public class CassandraTestController {
      * GET /api/cassandra/test/latest/{sensorId}?limit=10
      */
     @GetMapping("/latest/{sensorId}")
-    @Operation(summary = "Lire les dernières mesures", description = "Récupère les N dernières mesures d'un capteur pour la journée actuelle")
+    @Operation(summary = "Lire les dernières mesures", description = "Récupère les N dernières mesures d'un capteur sur les sept derniers jours UTC")
     public ResponseEntity<List<MeasurementEntity>> readLatestMeasurements(
             @PathVariable @Parameter(description = "Identifiant du capteur") String sensorId,
             @RequestParam(defaultValue = "10") @Parameter(description = "Nombre maximum de résultats") int limit) {

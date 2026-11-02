@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDown, ArrowUp, RefreshCw, RotateCcw } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Download, FileCheck2, MessageSquare, Printer, RefreshCw, RotateCcw } from 'lucide-react';
 import { api, settle } from '../api/client';
 import {
   Badge,
@@ -23,6 +23,7 @@ import {
   explainAnomaly,
   todayIso,
   timeShort,
+  downloadCsv,
 } from '../utils';
 
 const TONES = {
@@ -33,6 +34,11 @@ const TONES = {
   TEMPERATURE: 'purple',
 };
 const PAGE_SIZE = 15;
+const WORKFLOW_KEY = 'smartenergy.anomaly-workflow';
+
+function readWorkflow() {
+  try { return JSON.parse(localStorage.getItem(WORKFLOW_KEY) || '{}'); } catch { return {}; }
+}
 
 export default function Anomalies() {
   const [sortBy, setSortBy] = useState('timestamp');
@@ -44,15 +50,27 @@ export default function Anomalies() {
     staleTime: 60 * 1000,
   });
 
-  const [filters, setFilters] = useState({
-    sensorId: '',
-    method: '',
-    start: daysAgoIso(6),
-    end: todayIso(),
+  const [filters, setFilters] = useState(() => {
+    const defaults = { sensorId: '', method: '', start: daysAgoIso(6), end: todayIso() };
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem('smartenergy.anomaly-filters') || '{}') }; }
+    catch { return defaults; }
   });
   const [applied, setApplied] = useState(filters);
   const [formError, setFormError] = useState(null);
   const [page, setPage] = useState(1);
+  const [workflow, setWorkflow] = useState(readWorkflow);
+  const [noteFor, setNoteFor] = useState(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [workflowFilter, setWorkflowFilter] = useState('ALL');
+
+  useEffect(() => {
+    try { localStorage.setItem(WORKFLOW_KEY, JSON.stringify(workflow)); } catch { /* Le suivi reste disponible pendant cette session. */ }
+  }, [workflow]);
+
+  const updateWorkflow = (key, patch) => setWorkflow(current => ({
+    ...current,
+    [key]: { ...(current[key] || { status: 'OPEN', note: '' }), ...patch, updatedAt: new Date().toISOString() },
+  }));
 
   const {
     data: anomaliesData,
@@ -98,6 +116,7 @@ export default function Anomalies() {
       return setFormError('La période ne peut pas dépasser 31 jours (limite de l’API).');
     setFormError(null);
     setApplied({ ...filters });
+    localStorage.setItem('smartenergy.anomaly-filters', JSON.stringify(filters));
     setPage(1);
   };
 
@@ -110,12 +129,19 @@ export default function Anomalies() {
     };
     setFilters(defaultFilters);
     setApplied(defaultFilters);
+    localStorage.removeItem('smartenergy.anomaly-filters');
+    setWorkflowFilter('ALL');
     setPage(1);
   };
 
   const list = useMemo(
-    () => (anomaliesData?.list || []).filter(a => !applied.method || a.method === applied.method),
-    [anomaliesData, applied]
+    () => (anomaliesData?.list || []).filter(a => {
+      if (applied.method && a.method !== applied.method) return false;
+      if (workflowFilter === 'ALL') return true;
+      const key = `${a.sensorId}|${a.timestamp}|${a.method}`;
+      return (workflow[key]?.status || 'OPEN') === workflowFilter;
+    }),
+    [anomaliesData, applied, workflow, workflowFilter]
   );
   const counts = useMemo(() => {
     const c = {};
@@ -168,9 +194,11 @@ export default function Anomalies() {
         title="Alertes et anomalies"
         subtitle="Anomalies détectées par analytics-service (seuil, z-score, variation, tension, température)"
         actions={
-          <button className="icon-btn" onClick={() => refetch()} title="Actualiser">
-            <RefreshCw size={18} />
-          </button>
+          <>
+            <button className="btn ghost sm" disabled={!list.length} onClick={() => downloadCsv('anomalies.csv', list.map(a => { const explanation = explainAnomaly(a); const key = `${a.sensorId}|${a.timestamp}|${a.method}`; const state = workflow[key] || { status: 'OPEN' }; return { date: a.timestamp, capteur: a.sensorId, methode: METHOD_LABELS[a.method], observed: explanation.observed, seuil: explanation.limit, suivi: state.status, note: state.note }; }))}><Download size={14} /> CSV</button>
+            <button className="btn ghost sm" onClick={() => window.print()}><Printer size={14} /> PDF</button>
+            <button className="icon-btn" onClick={() => refetch()} title="Actualiser"><RefreshCw size={18} /></button>
+          </>
         }
         isFetching={isFetching}
       >
@@ -184,6 +212,7 @@ export default function Anomalies() {
       </PageHead>
 
       <ErrorBox error={sensorsError} onRetry={() => refetch()} />
+      <div className="workflow-local-note"><MessageSquare size={15} /> Les statuts et notes de traitement sont enregistrés sur cet appareil.</div>
 
       <Card>
         <form className="filters" onSubmit={submit}>
@@ -206,6 +235,11 @@ export default function Anomalies() {
                   {v}
                 </option>
               ))}
+            </select>
+          </Field>
+          <Field label="État de suivi">
+            <select value={workflowFilter} onChange={event => setWorkflowFilter(event.target.value)}>
+              <option value="ALL">Tous</option><option value="OPEN">À traiter</option><option value="ACKNOWLEDGED">En cours</option><option value="RESOLVED">Résolues</option>
             </select>
           </Field>
           <Field label="Du">
@@ -265,24 +299,34 @@ export default function Anomalies() {
                     <th>Valeur observée</th>
                     <th>Seuil</th>
                     <th>Explication</th>
+                    <th>Suivi</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((a, i) => {
                     const e = explainAnomaly(a);
+                    const eventKey = `${a.sensorId}|${a.timestamp}|${a.method}`;
+                    const state = workflow[eventKey] || { status: 'OPEN', note: '' };
                     return (
-                      <tr key={`${a.sensorId}-${a.timestamp}-${a.method}-${i}`}>
-                        <td>{dateTime(a.timestamp)}</td>
-                        <td className="mono">{a.sensorId}</td>
-                        <td>
-                          <Badge tone={TONES[a.method]}>{METHOD_LABELS[a.method]}</Badge>
-                        </td>
-                        <td>
-                          <b>{e.observed}</b>
-                        </td>
-                        <td>{e.limit}</td>
-                        <td className="explain">{e.text}</td>
-                      </tr>
+                      <Fragment key={`${a.sensorId}-${a.timestamp}-${a.method}-${i}`}>
+                        <tr>
+                          <td>{dateTime(a.timestamp)}</td>
+                          <td className="mono">{a.sensorId}</td>
+                          <td><Badge tone={TONES[a.method]}>{METHOD_LABELS[a.method]}</Badge></td>
+                          <td><b>{e.observed}</b></td>
+                          <td>{e.limit}</td>
+                          <td className="explain">{e.text}</td>
+                          <td><Badge tone={state.status === 'RESOLVED' ? 'green' : state.status === 'ACKNOWLEDGED' ? 'blue' : 'orange'}>{state.status === 'RESOLVED' ? 'Résolue' : state.status === 'ACKNOWLEDGED' ? 'En cours' : 'À traiter'}</Badge>{state.note && <small className="workflow-note-indicator">Note ajoutée</small>}</td>
+                          <td className="workflow-actions">
+                            {state.status !== 'RESOLVED' && <button className="btn ghost sm" onClick={() => updateWorkflow(eventKey, { status: state.status === 'ACKNOWLEDGED' ? 'OPEN' : 'ACKNOWLEDGED' })}><Check size={13} /> {state.status === 'ACKNOWLEDGED' ? 'Rouvrir' : 'Prendre en charge'}</button>}
+                            <button className="icon-btn" title="Ajouter une note" aria-label="Ajouter une note" onClick={() => { setNoteFor(eventKey); setNoteDraft(state.note || ''); }}><MessageSquare size={15} /></button>
+                            {state.status === 'RESOLVED' && <button className="icon-btn" title="Rouvrir l’anomalie" aria-label="Rouvrir l’anomalie" onClick={() => updateWorkflow(eventKey, { status: 'OPEN' })}><RotateCcw size={15} /></button>}
+                            {state.status !== 'RESOLVED' && <button className="icon-btn resolve-action" title="Marquer comme résolue" aria-label="Marquer comme résolue" onClick={() => updateWorkflow(eventKey, { status: 'RESOLVED' })}><FileCheck2 size={15} /></button>}
+                          </td>
+                        </tr>
+                        {noteFor === eventKey && <tr className="workflow-note-row"><td colSpan="8"><form onSubmit={event => { event.preventDefault(); updateWorkflow(eventKey, { note: noteDraft }); setNoteFor(null); }}><label htmlFor={`note-${i}`}>Note de traitement</label><textarea id={`note-${i}`} value={noteDraft} onChange={event => setNoteDraft(event.target.value)} rows="2" maxLength="500" placeholder="Décrivez la vérification ou l’intervention réalisée…" /><button className="btn sm">Enregistrer la note</button><button type="button" className="btn ghost sm" onClick={() => setNoteFor(null)}>Annuler</button></form></td></tr>}
+                      </Fragment>
                     );
                   })}
                 </tbody>
