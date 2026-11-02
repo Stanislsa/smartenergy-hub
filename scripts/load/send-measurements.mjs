@@ -18,6 +18,7 @@
 //           --collector <url> (défaut http://localhost:8081), --analytics <url> (défaut http://localhost:8083)
 
 import { generateMeasurement } from './profile.mjs'
+import { authHeaders } from './auth.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, all) => {
@@ -117,7 +118,7 @@ function printSummary(elapsed) {
 // ---------- Programme ----------
 let sensors
 try {
-  const res = await fetch(`${ANALYTICS}/api/sensors?active=true`)
+  const res = await fetch(`${ANALYTICS}/api/sensors?active=true`, { headers: await authHeaders(ANALYTICS) })
   if (!res.ok) exit(`GET /api/sensors a répondu ${res.status}`)
   sensors = (await res.json()).filter((s) => s.active && s.maxPowerKw > 0)
 } catch (e) {

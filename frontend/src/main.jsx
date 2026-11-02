@@ -13,6 +13,8 @@ import SensorDetail from './pages/SensorDetail';
 import Settings from './pages/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { queryClient } from './lib/queryClient';
+import Login from './pages/Login';
+import RequireAuth from './components/RequireAuth';
 import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -21,7 +23,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
-            <Route element={<Layout />}>
+            <Route path="login" element={<Login />} />
+            <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<Dashboard />} />
               <Route path="capteurs" element={<Sensors />} />
               <Route path="capteurs/:sensorId" element={<SensorDetail />} />

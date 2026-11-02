@@ -1,6 +1,6 @@
 // Client des API existantes du projet (aucune logique métier ici : les calculs
 // d'énergie et la détection d'anomalies sont faits par analytics-service).
-
+import { getToken, clearSession } from '../auth/auth';
 export class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -13,14 +13,16 @@ const DEFAULT_TIMEOUT = 30000; // 30 secondes
 async function request(url, options = {}) {
   let res;
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+  const token = getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-    res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      signal: controller.signal,
-      ...options,
-    });
+    res = await fetch(url, { ...options, headers, signal: controller.signal });
     clearTimeout(timeoutId);
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -40,6 +42,7 @@ async function request(url, options = {}) {
     body = text;
   }
   if (!res.ok) {
+    if (res.status === 401 && token) clearSession(); // jeton expiré ou invalide
     let msg = `Erreur ${res.status}`;
     if (body && typeof body === 'object') {
       const details = Array.isArray(body.details)
@@ -65,6 +68,10 @@ const qs = params => {
 const enc = encodeURIComponent;
 
 export const api = {
+  // login
+  login: (username, password) =>
+  request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  me: () => request('/api/auth/me'),
   // --- Capteurs (MongoDB, analytics-service) ---
   sensors: (filters = {}) => request(`/api/sensors${qs(filters)}`),
   sensor: id => request(`/api/sensors/${enc(id)}`),

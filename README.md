@@ -9,14 +9,27 @@ Projet multi-module Spring Boot pour la collecte, le stockage et l'analyse des d
 ```
 smartenergy-hub/
 ├── pom.xml                 (POM parent)
-├── docker-compose.yml      (MongoDB, Redis, Cassandra)
-├── collector-service/     (port 8081) - Collecte les données énergétiques
-├── storage-service/       (port 8082) - Stocke les données dans MongoDB/Redis/Cassandra
-├── analytics-service/     (port 8083) - API de lecture pour l'analyse
-├── frontend/              (À venir) - Interface utilisateur pour visualiser les données
-├── simulator/             (Python) - Simulateur de données énergétiques
-└── scripts/
-    └── init-cassandra.cql
+├── docker-compose.yml      (bases, services Java, ai-service ; profils `ai` et `all`)
+├── collector-service/      (port 8081) - Reçoit et valide les mesures, les publie dans Redis Streams
+├── storage-service/        (port 8082) - Lit le flux Redis et écrit dans Cassandra
+├── analytics-service/      (port 8083) - API de lecture : capteurs (MongoDB), mesures (Cassandra), analyses
+├── ai-service/             (port 8085) - Prévisions et détection d'anomalies (Python / FastAPI)
+├── frontend/               (port 5173) - Interface React (Vite)
+├── scripts/
+│   ├── init-cassandra.cql, init-mongo.js   (initialisation des bases)
+│   ├── load/                               (envoi de mesures au Collector : simulateur officiel)
+│   └── test-data/                          (mesures et données des scénarios de test)
+├── simulator/              ancien prototype Python : n'envoie rien au Collector (voir scripts/load)
+└── docs/                   api.md, tests.md, monitoring.md, securite.md, demo.md, checklist-remise.md
+```
+
+### Chaîne de données
+
+```
+Simulateur (scripts/load) → Collector → Redis Streams → Storage → Cassandra ─┐
+                                        energy-measurements                  ├→ Analytics → ai-service
+                                        (groupe storage-group)   MongoDB ────┘      ↓
+                                                                               Frontend React
 ```
 
 ### Architecture REST API
@@ -56,74 +69,88 @@ graph TD
 
 ## 🚀 Démarrage Rapide
 
-### Démarrage avec Docker (tout-en-un)
+### Prérequis
+
+- Java 17 et Maven (ou le wrapper `mvnw` / `mvnw.cmd` fourni)
+- Docker et Docker Compose (Docker Desktop sous Windows)
+- Node.js 18 ou plus (frontend et scripts d'envoi de mesures)
+
+### 1. Démarrer la plateforme avec Docker
 
 ```powershell
-docker compose up -d --build collector-service storage-service analytics-service
-docker compose ps -a
+docker compose --profile all up -d --build
+docker compose ps
 ```
-Swagger : Collector http://localhost:8081/swagger-ui.html, Analytics http://localhost:8083/swagger-ui/index.html.
-Arrêt (les données sont conservées) : `docker compose down`. N'utilisez jamais `-v`.
 
-### Prérequis
-- Java 17
-- Maven 3.8+
-- Docker & Docker Compose
-- Python 3.x (pour le simulateur)
+Les services sont rattachés à des **profils** : sans `--profile`, `docker compose up -d` ne démarre rien.
 
-### Démarrage du projet
+| Profil | Services démarrés |
+|---|---|
+| `ai` | MongoDB, Redis, Cassandra, scripts d'initialisation, ai-service (pour développer les services Java depuis l'IDE) |
+| `all` | tout ce qui précède, plus collector-service, storage-service et analytics-service |
 
-1. **Démarrer les bases de données avec Docker Compose**
-   ```bash
-   docker compose up -d
-   ```
+La première construction des images est longue. Cassandra met 1 à 2 minutes à devenir `healthy`.
+Arrêt : `docker compose down`. N'utilisez jamais `-v` : les données (volumes Docker) seraient perdues.
 
-2. **Initialiser Cassandra**
-   ```bash
-   docker cp scripts/init-cassandra.cql smartenergy-hub-cassandra-1:/tmp/init-cassandra.cql
-   docker exec smartenergy-hub-cassandra-1 cqlsh -f /tmp/init-cassandra.cql
-   ```
+### 2. Alimenter la plateforme en mesures (simulateur)
 
-3. **Construire le projet**
-   ```bash
-   ./mvnw clean install -DskipTests
-   ```
+`scripts/load/send-measurements.mjs` joue le rôle de simulateur : il envoie des mesures au Collector pour les
+capteurs actifs de MongoDB (profil jour/nuit, bruit, pics optionnels).
 
-4. **Démarrer les services**
-   ```bash
-   # Terminal 1
-   cd collector-service && java -jar target/collector-service-0.0.1-SNAPSHOT.jar
-   
-   # Terminal 2
-   cd storage-service && java -jar target/storage-service-0.0.1-SNAPSHOT.jar
-   
-   # Terminal 3
-   cd analytics-service && java -jar target/analytics-service-0.0.1-SNAPSHOT.jar
-   ```
+```powershell
+# historique des 24 dernières heures (nécessaire à la prévision), puis arrêt
+node scripts/load/send-measurements.mjs --backfill-hours 24
 
-5. **Lancer le simulateur (optionnel)**
-   ```bash
-   cd simulator
-   pip install -r requirements.txt
-   python energy_simulator.py
-   ```
+# flux continu : 1 mesure par seconde, 1 % de pics (Ctrl+C pour arrêter)
+node scripts/load/send-measurements.mjs --spike 0.01
+```
 
-### Points de terminaison des services
+Toutes les options sont décrites dans `scripts/load/README.md`.
 
-- **Collector Service**: http://localhost:8081
-- **Storage Service**: http://localhost:8082
-- **Analytics Service**: http://localhost:8083
+### 3. Lancer l'interface web
 
-Chaque service dispose de :
-- `/` - Statut du service
-- `/health` - Vérification de santé
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-### Ports des bases de données
+Puis ouvrir http://localhost:5173 (le serveur de développement relaie les appels vers les services).
 
-- **MongoDB**: localhost:27018
-- **Redis**: localhost:6380
-- **Cassandra**: localhost:9042
+### 4. Documentation des API (Swagger)
 
+| Service | URL |
+|---|---|
+| Collector | http://localhost:8081/swagger-ui.html |
+| Storage | http://localhost:8082/swagger-ui/index.html |
+| Analytics | http://localhost:8083/swagger-ui/index.html |
+| ai-service | http://localhost:8085/docs |
+
+Le contrat de données des mesures est décrit dans `docs/api.md`.
+
+### Développer sans Docker pour les services Java
+
+```powershell
+docker compose --profile ai up -d          # bases + ai-service seulement
+mvnw.cmd clean install -DskipTests
+mvnw.cmd -pl collector-service spring-boot:run     # un terminal par service
+mvnw.cmd -pl storage-service spring-boot:run
+mvnw.cmd -pl analytics-service spring-boot:run
+```
+
+Sous Linux ou macOS, utiliser `./mvnw` à la place de `mvnw.cmd`. Tests unitaires : `mvnw.cmd test`.
+
+### Ports
+
+| Élément | Port |
+|---|---|
+| Collector / Storage / Analytics | 8081 / 8082 / 8083 |
+| ai-service | 8085 |
+| Frontend (développement) | 5173 |
+| MongoDB / Redis / Cassandra | 27018 / 6380 / 9042 |
+
+Chaque service Java répond sur `/` (statut) et `/health`. Le Collector expose aussi `/api/health`
+et les métriques Actuator (`/actuator/metrics`).
 ---
 
 ## 📋 Guide du Workflow Git

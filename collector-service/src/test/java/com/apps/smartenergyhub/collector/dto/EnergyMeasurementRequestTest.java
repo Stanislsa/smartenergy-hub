@@ -106,4 +106,99 @@ class EnergyMeasurementRequestTest {
 
         assertThat(violationOn(validate(request), "frequency")).isTrue();
     }
+
+    // ---- Plages plausibles (étape 1 du guide : « tension dans une plage plausible ») ----
+
+    @Test
+    void puissanceAbsurdeEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.parse("2026-09-30T08:15:00Z"),
+                5000.0, 226.4, null, null, null);
+
+        assertThat(violationOn(validate(request), "powerKw")).isTrue();
+    }
+
+    @Test
+    void tensionTropEleveeEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.parse("2026-09-30T08:15:00Z"),
+                3.72, 600.0, null, null, null);
+
+        assertThat(violationOn(validate(request), "voltage")).isTrue();
+    }
+
+    @Test
+    void temperatureTropBasseEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.parse("2026-09-30T08:15:00Z"),
+                3.72, 226.4, null, null, -80.0);
+
+        assertThat(violationOn(validate(request), "temperature")).isTrue();
+    }
+
+    @Test
+    void temperatureTropHauteEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.parse("2026-09-30T08:15:00Z"),
+                3.72, 226.4, null, null, 150.0);
+
+        assertThat(violationOn(validate(request), "temperature")).isTrue();
+    }
+
+    @Test
+    void frequenceTropBasseEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.parse("2026-09-30T08:15:00Z"),
+                3.72, 226.4, null, 10.0, null);
+
+        assertThat(violationOn(validate(request), "frequency")).isTrue();
+    }
+
+    @Test
+    void frequenceTropHauteEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.parse("2026-09-30T08:15:00Z"),
+                3.72, 226.4, null, 100.0, null);
+
+        assertThat(violationOn(validate(request), "frequency")).isTrue();
+    }
+
+    // ---- Horodatage plausible (étape 1 du guide : « faut-il accepter une mesure très ancienne ? ») ----
+
+    @Test
+    void dateRecenteEstAcceptee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.now().minusSeconds(3600),
+                3.72, 226.4, null, null, null);
+
+        assertThat(validate(request)).isEmpty();
+    }
+
+    @Test
+    void dateLegerementDansLeFuturEstAcceptee() {
+        // tolérance de 5 minutes pour une horloge de capteur légèrement en avance
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.now().plusSeconds(60),
+                3.72, 226.4, null, null, null);
+
+        assertThat(validate(request)).isEmpty();
+    }
+
+    @Test
+    void dateDansLeFuturEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.now().plusSeconds(3600),
+                3.72, 226.4, null, null, null);
+
+        assertThat(violationOn(validate(request), "timestamp")).isTrue();
+    }
+
+    @Test
+    void dateAbsurdementAncienneEstRejetee() {
+        var request = new EnergyMeasurementRequest(
+                "SENSOR-001", Instant.EPOCH,
+                3.72, 226.4, null, null, null);
+
+        assertThat(violationOn(validate(request), "timestamp")).isTrue();
+    }
 }

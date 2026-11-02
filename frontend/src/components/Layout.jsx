@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import LogoutButton from './LogoutButton';
 import {
   AlertTriangle,
   Bell,
@@ -179,12 +180,13 @@ export default function Layout() {
               onClick={() => navigate('/anomalies')}
               title="Anomalies des dernières 24 h"
             >
-              <Bell size={18} />
+              <Bell size={18} /> 
               {anomalyCount > 0 && <em>{anomalyCount}</em>}
             </button>
             <span className="account-avatar" aria-hidden="true">
               <UserRound size={15} />
             </span>
+            <LogoutButton />
           </div>
         </header>
         <main className="content">
