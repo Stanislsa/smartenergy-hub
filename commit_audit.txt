@@ -1,8 +1,0 @@
-Ajouter le rapport d'audit du projet
-
-- Audit complet de l'état actuel vs cahier des charges
-- Inventaire des endpoints API (Collector, Storage, Analytics, AI)
-- Analyse des pages frontend
-- État des modèles IA
-- Checklist de réalisation (0/24)
-- Recommandations pour stabiliser le projet
