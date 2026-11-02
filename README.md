@@ -87,7 +87,7 @@ Les services sont rattachés à des **profils** : sans `--profile`, `docker comp
 | Profil | Services démarrés |
 |---|---|
 | `ai` | MongoDB, Redis, Cassandra, scripts d'initialisation, ai-service (pour développer les services Java depuis l'IDE) |
-| `all` | tout ce qui précède, plus collector-service, storage-service et analytics-service |
+| `all` | tout ce qui précède, plus collector-service, storage-service, analytics-service et le frontend (nginx, http://localhost:5173) |
 
 La première construction des images est longue. Cassandra met 1 à 2 minutes à devenir `healthy`.
 Arrêt : `docker compose down`. N'utilisez jamais `-v` : les données (volumes Docker) seraient perdues.
@@ -116,6 +116,13 @@ npm run dev
 ```
 
 Puis ouvrir http://localhost:5173 (le serveur de développement relaie les appels vers les services).
+
+Avec `--profile all`, le frontend tourne déjà dans Docker sur http://localhost:5173 : cette étape ne sert qu'à
+développer le front avec les services lancés via `--profile ai` ou depuis l'IDE. Si le conteneur `frontend` tourne,
+Vite démarre sur le port suivant (5174).
+
+L'authentification (JWT, rôles ADMIN et VIEWER) est désactivée par défaut. Pour l'activer, copier `.env.example` en
+`.env`, remplacer les valeurs d'exemple, puis relancer : voir `docs/securite.md`.
 
 ### 4. Documentation des API (Swagger)
 

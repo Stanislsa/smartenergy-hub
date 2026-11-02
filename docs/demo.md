@@ -6,15 +6,31 @@ Commandes Windows (CMD), depuis la racine du dépôt.
 
 ## 0. Préparation (avant la soutenance, 15 min)
 
+Deux façons de lancer la plateforme. **Ne pas mélanger les deux** : elles utilisent les mêmes ports (8081 à 8085, 5173).
+
+**A. Tout dans Docker (une commande, conseillé)**
+
 | # | Action | Commande / vérification |
 |---|---|---|
-| 1 | Bases de données | `docker compose --profile ai up -d mongo redis cassandra` (première fois : `docker compose --profile ai up cassandra-init mongo-init`) |
+| 1 | Bases, scripts d'initialisation, 3 services Java, ai-service, front (nginx) | `docker compose --profile all up -d --build` (première fois : 10 à 20 min de construction) |
+| 2 | État des conteneurs | `docker compose --profile all ps` : services `running` ou `healthy`, scripts `*-init` terminés (`exited (0)`) |
+| 3 | Modèles du service IA (écran Prévision) | entraînés selon `ai-service/TRAINING_PROCEDURE.md` (les fichiers `.joblib` ne sont pas versionnés) |
+| 4 | Historique récent (24 h pour la prévision Random Forest, 168 h pour le LSTM) | `node scripts/load/send-measurements.mjs --backfill-hours 168` |
+| 5 | Front | http://localhost:5173 (servi par nginx, qui relaie `/api`, `/ai` et `/svc` vers les services) |
+| 6 | Contrôle | écran **Tableau de bord** : pastille « Opérationnel », tous les services « En ligne » |
+
+**B. Services Java en local (développement)**
+
+| # | Action | Commande / vérification |
+|---|---|---|
+| 1 | Bases et ai-service | `docker compose --profile ai up -d` |
 | 2 | Vérifier que Cassandra répond | `docker compose --profile ai exec cassandra cqlsh -e "DESCRIBE KEYSPACES"` |
 | 3 | Services Java, un terminal chacun, dans cet ordre | `mvn -pl storage-service spring-boot:run`, puis `mvn -pl collector-service spring-boot:run`, puis `mvn -pl analytics-service spring-boot:run` |
-| 4 | Service IA (écran Prévision) | `docker compose --profile ai up -d ai-service`, modèles entraînés selon `ai-service/TRAINING_PROCEDURE.md` |
-| 5 | Front | `cd frontend`, `npm install`, `npm run dev` → http://localhost:5173 |
-| 6 | Historique récent (24 h pour la prévision Random Forest, 168 h pour le LSTM) | `node scripts/load/send-measurements.mjs --backfill-hours 168` |
-| 7 | Contrôle | écran **Tableau de bord** : tous les services « En ligne » |
+| 4 | Front | `cd frontend`, `npm install`, `npm run dev` → http://localhost:5173 |
+| 5 | Historique récent | `node scripts/load/send-measurements.mjs --backfill-hours 168` |
+
+L'authentification est **désactivée par défaut** : le front s'ouvre directement sur le Tableau de bord. Pour la montrer,
+voir l'étape 6 bis.
 
 Garder ouverts : le front, un terminal libre, la fenêtre du Storage.
 
@@ -80,6 +96,17 @@ Preuves détaillées : `docs/tests.md` n° 5, n° 6, P2 (panne de Cassandra, C8)
 - Résultats de charge : `docs/monitoring.md` (aucune perte jusqu'à 100 mesures/s ; Storage limité vers 65-70/s).
 - Swagger : http://localhost:8083/swagger-ui/index.html (et 8081, 8082).
 
+## 6 bis. Sécurité (optionnel, 1 min)
+
+Lancer la plateforme avec l'authentification activée (fichier `.env` à la racine, non versionné, à partir de
+`.env.example` : `APP_SECURITY_ENABLED=true`, secret JWT d'au moins 32 caractères, comptes ADMIN et VIEWER), puis :
+
+1. ouvrir le front : il affiche la page de connexion ;
+2. se connecter avec le compte VIEWER : lecture possible, mais créer ou modifier un capteur répond `403` ;
+3. se connecter avec le compte ADMIN : écriture autorisée.
+
+Détails : `docs/securite.md`, section 2.
+
 ## 7. Plan B (si un incident survient)
 
 | Symptôme | Cause connue | Action |
@@ -89,7 +116,11 @@ Preuves détaillées : `docs/tests.md` n° 5, n° 6, P2 (panne de Cassandra, C8)
 | Docker à 100 % de CPU, interface figée | poste saturé (Cassandra au démarrage) | fermer les autres applications, redémarrer Docker Desktop |
 | Écran Prévision : « Service injoignable » ou 422 | ai-service arrêté, ou moins de 24 h / 168 h de mesures | lancer l'ai-service ; `send-measurements.mjs --backfill-hours 168` |
 | Courbes vides dans le front | pas de mesures récentes | lancer `send-measurements.mjs` |
+| Cartes du Tableau de bord vides (« — kW ») alors que la courbe s'affiche | page chargée avant l'arrivée des mesures | bouton **Actualiser** ou F5 |
+| Pastille « À vérifier » | un service considéré comme indispensable est arrêté (souvent ai-service) | `docker compose --profile all ps`, relancer le service manquant |
+| Front Docker : `ERR_CONNECTION_REFUSED` | adresse sans `:5173`, ou conteneur `frontend` arrêté | ouvrir http://localhost:5173 ; `docker compose --profile all logs --tail 30 frontend` |
+| `npm run dev` démarre sur 5174 | le front Docker occupe déjà le port 5173 | utiliser http://localhost:5173 (Docker) ou arrêter le conteneur `frontend` |
 
 Prévoir des captures d'écran de chaque étape en secours.
 
-À revoir après la fusion de la branche `feature/fix-ai-forecast-services` (écran Prévision modifié, prévision LSTM).
+À rejouer en entier avant la soutenance (branche IA de Stan fusionnée le 02/11 : écran Prévision modifié, prévision LSTM).
