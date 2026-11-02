@@ -187,9 +187,9 @@ export default function Sensors() {
                     <td>
                       <Link
                         className="link"
-                        to={`/historique?sensor=${encodeURIComponent(s.sensorId)}`}
+                        to={`/capteurs/${encodeURIComponent(s.sensorId)}`}
                       >
-                        Historique ›
+                        Voir le capteur ›
                       </Link>
                     </td>
                   </tr>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Area,
@@ -34,8 +34,14 @@ const HORIZONS = [
   { label: '6 heures', minutes: 360 },
   { label: '12 heures', minutes: 720 },
   { label: '24 heures', minutes: 1440 },
+  { label: '48 heures', minutes: 2880 },
+  { label: '3 jours', minutes: 4320 },
+  { label: '7 jours', minutes: 10080 },
 ];
-const STEPS = 6;
+const MODELS = [
+  { label: 'Random Forest (court terme)', value: 'rf', description: 'Précisions à court terme (1-24h)' },
+  { label: 'LSTM (long terme)', value: 'lstm', description: 'Prévisions à long terme (jusqu\'à 7 jours)' },
+];
 
 export default function Forecast() {
   const { data: sensorsData, isLoading: sensorsLoading, isFetching: sensorsFetching, error: sensorsError } = useQuery({
@@ -52,9 +58,23 @@ export default function Forecast() {
 
   const [sensorId, setSensorId] = useState('');
   const [horizon, setHorizon] = useState(360);
+  const [model, setModel] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('smartenergy.preferences') || '{}').forecastModel || 'rf';
+    } catch {
+      return 'rf';
+    }
+  });
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
   const [generatedAt, setGeneratedAt] = useState(null);
+
+  const forecastModelQuery = useQuery({
+    queryKey: ['forecast-model-info', sensorId, model],
+    queryFn: () => api.forecastInfo(sensorId, model),
+    enabled: Boolean(sensorId),
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     if (sensorsData && !sensorId) setSensorId(sensorsData[0]?.sensorId || '');
@@ -66,20 +86,18 @@ export default function Forecast() {
     setResult(null);
     setGeneratedAt(null);
     const { from, to } = last24h();
-    const minutes = Array.from({ length: STEPS }, (_, i) =>
-      Math.round((horizon * (i + 1)) / STEPS)
-    );
-    const [history, ...preds] = await Promise.all([
+    const forecastFn = model === 'lstm' ? api.forecastLSTM : api.forecast;
+    const [history, forecast] = await Promise.all([
       settle(api.history(sensorId, from, to, 5000)),
-      ...minutes.map(m => settle(api.forecast(sensorId, m))),
+      settle(forecastFn(sensorId, horizon)),
     ]);
-    const ok = preds.filter(p => p.ok).map(p => p.value);
     setResult({
       sensorId,
       horizon,
+      model,
       history: history.ok ? history.value.slice().reverse() : [],
-      forecasts: ok,
-      error: ok.length === 0 ? preds[0]?.error : null,
+      forecast: forecast.ok ? forecast.value : null,
+      error: forecast.error || history.error,
     });
     setGeneratedAt(new Date());
     setRunning(false);
@@ -88,25 +106,39 @@ export default function Forecast() {
   const resetFilters = () => {
     setSensorId(sensorsData?.[0]?.sensorId || '');
     setHorizon(360);
+    setModel('rf');
     setResult(null);
     setGeneratedAt(null);
   };
 
-  const chart = result
-    ? [
-        ...result.history.map(m => ({ t: new Date(m.timestamp).getTime(), real: m.powerKw })),
-        ...result.forecasts.map(f => ({
-          t: new Date(
-            f.forecast_time.endsWith('Z') ? f.forecast_time : `${f.forecast_time}Z`
-          ).getTime(),
-          pred: f.predicted_power_kw,
-          band: f.confidence_interval
-            ? [f.confidence_interval.lower, f.confidence_interval.upper]
-            : undefined,
-        })),
-      ].sort((a, b) => a.t - b.t)
-    : [];
-  const last = result?.forecasts.at(-1);
+  const chart = useMemo(() => {
+    if (!result?.forecast) return [];
+    
+    const historyData = result.history.map(m => ({ t: new Date(m.timestamp).getTime(), real: m.powerKw }));
+    const forecastData = result.forecast.forecast_series.map(f => {
+      const ci = f.confidence_interval;
+      const bandWidth = ci ? ci.upper - ci.lower : 0;
+      const predValue = f.predicted_power_kw;
+      const relativeWidth = predValue > 0 ? (bandWidth / predValue) * 100 : 0;
+      
+      let bandColor = '#fbbf24';
+      if (relativeWidth < 10) bandColor = '#10b981';
+      else if (relativeWidth > 25) bandColor = '#ef4444';
+      
+      return {
+        t: new Date(f.timestamp).getTime(),
+        pred: f.predicted_power_kw,
+        band: ci ? [ci.lower, ci.upper] : undefined,
+        bandColor,
+        bandWidth,
+        relativeWidth,
+      };
+    });
+    
+    return [...historyData, ...forecastData].sort((a, b) => a.t - b.t);
+  }, [result?.forecast, result?.history]);
+  
+  const last = result?.forecast?.forecast_series?.at(-1);
 
   const activeFilters = [];
   if (sensorId) {
@@ -115,12 +147,14 @@ export default function Forecast() {
   }
   const horizonLabel = HORIZONS.find(h => h.minutes === horizon)?.label;
   if (horizonLabel) activeFilters.push({ label: `Horizon: ${horizonLabel}`, onRemove: () => {} });
+  const modelLabel = MODELS.find(m => m.value === model)?.label;
+  if (modelLabel) activeFilters.push({ label: `Modèle: ${modelLabel}`, onRemove: () => {} });
 
   return (
     <>
       <PageHead
         title="Prévision de la consommation"
-        subtitle="Puissance estimée par le service IA (Random Forest) pour les prochaines heures"
+        subtitle="Puissance estimée par le service IA (Random Forest ou LSTM) pour les prochaines heures"
         actions={
           <button className="icon-btn" onClick={() => refetchStatus()} title="Actualiser">
             <RefreshCw size={18} />
@@ -137,6 +171,16 @@ export default function Forecast() {
         <form className="filters" onSubmit={generate}>
           <Field label="Capteur">
             <SensorSelect sensors={sensorsData} value={sensorId} onChange={setSensorId} />
+          </Field>
+          <Field label="Modèle">
+            <select value={model} onChange={e => setModel(e.target.value)}>
+              {MODELS.map(m => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            {model === 'lstm' && <p className="hint">Nécessite 7 jours d\'historique (168h)</p>}
           </Field>
           <Field label="Horizon">
             <select value={horizon} onChange={e => setHorizon(Number(e.target.value))}>
@@ -167,14 +211,18 @@ export default function Forecast() {
               <ErrorBox error={result.error} />
               <p className="hint">
                 {result.error.status === 503
-                  ? 'Le modèle de prévision n’est pas encore entraîné (fichier du modèle absent dans ai-service).'
-                  : result.error.status === 0
-                    ? 'Le service IA (port 8085) ne répond pas : vérifiez qu’il est démarré.'
-                    : 'Le service IA a renvoyé une erreur : voir ses logs.'}
+                  ? result.model === 'lstm'
+                    ? 'Le modèle LSTM n\'est pas encore entraîné (fichier du modèle absent dans ai-service).'
+                    : 'Le modèle de prévision n\'est pas encore entraîné (fichier du modèle absent dans ai-service).'
+                  : result.error.status === 422 && result.model === 'lstm'
+                    ? 'Données insuffisantes pour LSTM : besoin de 7 jours (168h) d\'historique.'
+                    : result.error.status === 0
+                      ? 'Le service IA (port 8085) ne répond pas : vérifiez qu\'il est démarré.'
+                      : 'Le service IA a renvoyé une erreur : voir ses logs.'}
               </p>
             </>
           )}
-          {result && !result.error && chart.length > 0 && (
+          {result && !result.error && result.forecast && chart.length > 0 && (
             <>
               <FilterBar filters={activeFilters} onClear={resetFilters} />
               <ResponsiveContainer width="100%" height={280}>
@@ -230,34 +278,65 @@ export default function Forecast() {
         </Card>
 
         <div className="stack">
-          <Card title="Résultats de la prévision" icon={Info}>
-            {!last && <EmptyState icon="info" title="Pas encore de prévision" description="Générez une prévision pour voir les résultats." />}
-            {last && (
+          <Card title="Modèle de prévision sélectionné" icon={Brain}>
+            {forecastModelQuery.isLoading && <div className="state muted">Chargement des métadonnées…</div>}
+            {forecastModelQuery.error && <div className="model-info-unavailable">Aucun modèle entraîné n’est disponible pour ce capteur et ce choix.</div>}
+            {forecastModelQuery.data && (
               <dl className="kv">
-                <dt>Puissance prévue (à {result.horizon / 60} h)</dt>
-                <dd>{num(last.predicted_power_kw)} kW</dd>
-                {last.confidence_interval && (
-                  <>
-                    <dt>Intervalle de confiance</dt>
-                    <dd>
-                      {num(last.confidence_interval.lower)} – {num(last.confidence_interval.upper)}{' '}
-                      kW
-                    </dd>
-                  </>
-                )}
-                <dt>Instant prévu</dt>
-                <dd>
-                  {dateTime(
-                    last.forecast_time.endsWith('Z') ? last.forecast_time : `${last.forecast_time}Z`
-                  )}
-                </dd>
-                <dt>Version du modèle</dt>
-                <dd>{last.model_version}</dd>
-                <dt>Points calculés</dt>
-                <dd>
-                  {result.forecasts.length} / {STEPS}
-                </dd>
+                <dt>État</dt><dd>{forecastModelQuery.data.status === 'loaded' ? 'Disponible' : 'Indisponible'}</dd>
+                <dt>Version</dt><dd>{forecastModelQuery.data.version || '—'}</dd>
+                <dt>Entraîné le</dt><dd>{forecastModelQuery.data.trained_at ? new Date(forecastModelQuery.data.trained_at).toLocaleString('fr-FR') : '—'}</dd>
+                <dt>Échantillons de test</dt><dd>{forecastModelQuery.data.test_samples ?? '—'}</dd>
+                {Object.entries(forecastModelQuery.data.metrics || {}).map(([key, value]) => <Fragment key={key}><dt>{key.toUpperCase()}</dt><dd>{num(value, 3)}</dd></Fragment>)}
               </dl>
+            )}
+            <p className="hint">MAE et RMSE mesurent l’erreur de prévision; R² indique la part de variation expliquée par le modèle.</p>
+          </Card>
+          <Card title="Résultats de la prévision" icon={Info}>
+            {!result?.forecast && <EmptyState icon="info" title="Pas encore de prévision" description="Générez une prévision pour voir les résultats." />}
+            {result?.forecast && (
+              <>
+                <dl className="kv">
+                  <dt>Points de prévision</dt>
+                  <dd>{result.forecast.forecast_series.length} heures</dd>
+                  <dt>Horizon total</dt>
+                  <dd>{result.horizon / 60} heures</dd>
+                  <dt>Puissance moyenne prévue</dt>
+                  <dd>
+                    {num(result.forecast.forecast_series.reduce((sum, f) => sum + f.predicted_power_kw, 0) / result.forecast.forecast_series.length)} kW
+                  </dd>
+                  <dt>Puissance max prévue</dt>
+                  <dd>{num(Math.max(...result.forecast.forecast_series.map(f => f.predicted_power_kw)))} kW</dd>
+                  <dt>Puissance min prévue</dt>
+                  <dd>{num(Math.min(...result.forecast.forecast_series.map(f => f.predicted_power_kw)))} kW</dd>
+                  <dt>Version du modèle</dt>
+                  <dd>{result.forecast.model_version}</dd>
+                </dl>
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Intervalles de confiance par heure</h4>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '12px' }}>
+                    {result.forecast.forecast_series.map((f, i) => {
+                      const ci = f.confidence_interval;
+                      const bandWidth = ci ? ci.upper - ci.lower : 0;
+                      const predValue = f.predicted_power_kw;
+                      const relativeWidth = predValue > 0 ? (bandWidth / predValue) * 100 : 0;
+                      let color = '#fbbf24';
+                      if (relativeWidth < 10) color = '#10b981';
+                      else if (relativeWidth > 25) color = '#ef4444';
+                      const time = new Date(f.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
+                          <span style={{ color: '#6b7280' }}>{time}</span>
+                          <span style={{ fontWeight: 500 }}>{num(f.predicted_power_kw)} kW</span>
+                          <span style={{ color }}>
+                            [{num(ci?.lower)} – {num(ci?.upper)}] ({relativeWidth.toFixed(1)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             )}
           </Card>
           <Card title="Modèle de détection (service IA)" icon={Brain}>

@@ -9,8 +9,8 @@ env/
 ENV/
 
 # Données
-data/raw/*.csv
-data/raw/*.json
+# data/raw/*.csv
+# data/raw/*.json
 
 # Modèles entraînés
 artifacts/**/*.joblib

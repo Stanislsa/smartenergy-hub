@@ -14,7 +14,19 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, AlertTriangle, Cpu, Gauge, RefreshCw, Server, Thermometer, Zap } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  CircleCheck,
+  Cpu,
+  Gauge,
+  RefreshCw,
+  Server,
+  Sparkles,
+  Thermometer,
+  Zap,
+} from 'lucide-react';
 import { api, settle } from '../api/client';
 import {
   Card,
@@ -167,6 +179,25 @@ export default function Dashboard() {
             sub={`${kpis.total ? Math.round((kpis.active / kpis.total) * 100) : 0} % actifs`}
           />
         </div>
+      )}
+
+      {dashboardData?.sensors.length === 0 && (
+        <Card className="onboarding-card">
+          <div className="onboarding-copy">
+            <span className="onboarding-icon"><Sparkles size={18} /></span>
+            <div>
+              <span className="page-eyebrow">BIENVENUE SUR SMARTENERGY HUB</span>
+              <h2>Votre espace est prêt à être configuré</h2>
+              <p>Ajoutez un premier capteur pour commencer à suivre vos consommations et recevoir des analyses.</p>
+            </div>
+          </div>
+          <div className="onboarding-steps">
+            <span className={services && Object.values(services).every(Boolean) ? '' : 'pending'}>{services && Object.values(services).every(Boolean) ? <CircleCheck size={16} /> : <span>1</span>} Vérifier les connexions</span>
+            <span className="pending"><span>2</span> Ajouter un capteur</span>
+            <span className="pending"><span>3</span> Explorer les premières mesures</span>
+          </div>
+          <Link className="btn onboarding-action" to="/capteurs">Ajouter un capteur <ArrowRight size={15} /></Link>
+        </Card>
       )}
 
       {dashboardData && (

@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -36,7 +37,15 @@ public class CassandraMeasurementService {
      */
     public void saveMeasurement(String sensorId, Instant timestamp, Double powerKw, 
                                  Double voltage, Double current, Double frequency, Double temperature) {
-        
+        if (sensorId == null || sensorId.isBlank()) {
+            throw new IllegalArgumentException("sensorId ne peut pas être vide");
+        }
+        if (timestamp == null) {
+            throw new IllegalArgumentException("timestamp est obligatoire");
+        }
+        if (powerKw == null || !Double.isFinite(powerKw) || powerKw < 0) {
+            throw new IllegalArgumentException("powerKw doit être une valeur finie positive ou nulle");
+        }
         LocalDate day = timestamp.atZone(ZoneOffset.UTC).toLocalDate();
         UUID recordId = UUID.randomUUID();
         
@@ -69,9 +78,21 @@ public class CassandraMeasurementService {
      * @return Liste des mesures
      */
     public List<MeasurementEntity> getLatestMeasurements(String sensorId, int limit) {
-        LocalDate today = LocalDate.now();
-        System.out.println("Récupération des " + limit + " dernières mesures - Sensor: " + sensorId + ", Day: " + today);
-        List<MeasurementEntity> all = measurementRepository.findByKeySensorIdAndKeyDay(sensorId, today);
-        return all.stream().limit(limit).toList();
+        if (sensorId == null || sensorId.isBlank()) {
+            throw new IllegalArgumentException("sensorId ne peut pas être vide");
+        }
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit doit être supérieur à zéro");
+        }
+        LocalDate day = LocalDate.now(ZoneOffset.UTC);
+        List<MeasurementEntity> latest = new ArrayList<>(limit);
+        int daysChecked = 0;
+        while (latest.size() < limit && daysChecked < 7) {
+            int remaining = limit - latest.size();
+            latest.addAll(measurementRepository.findLatestBySensorAndDay(sensorId, day, remaining));
+            day = day.minusDays(1);
+            daysChecked++;
+        }
+        return latest;
     }
 }

@@ -46,6 +46,13 @@ class CassandraService:
         except Exception as e:
             logger.error(f"Erreur de connexion Cassandra: {e}")
             self.is_connected = False
+            if self.session:
+                self.session.shutdown()
+            if self.cluster:
+                self.cluster.shutdown()
+            self.session = None
+            self.cluster = None
+            raise RuntimeError("Connexion à Cassandra impossible") from e
     
     def disconnect(self):
         """Ferme la connexion Cassandra"""
@@ -54,6 +61,8 @@ class CassandraService:
         if self.cluster:
             self.cluster.shutdown()
         self.is_connected = False
+        self.session = None
+        self.cluster = None
         logger.info("Connexion Cassandra fermée")
     
     def get_measurements_by_sensor(
@@ -83,10 +92,17 @@ class CassandraService:
                 start = datetime.now(timezone.utc) - timedelta(days=7)
             if end is None:
                 end = datetime.now(timezone.utc)
+
+            if start.tzinfo is None or end.tzinfo is None:
+                raise ValueError("Les bornes start et end doivent inclure un fuseau horaire")
+            start = start.astimezone(timezone.utc)
+            end = end.astimezone(timezone.utc)
+            if start >= end:
+                return []
             
             stmt = self.session.prepare(QUERY)
             rows, day = [], start.date()
-            while day <= (end - timedelta(microseconds=1)).date():
+            while day < end.date() or (day == end.date() and end.time() != datetime.min.time()):
                 rows.extend(self.session.execute(stmt, (sensor_id, day, start, end)))
                 day += timedelta(days=1)
             

@@ -70,6 +70,23 @@ export const last24h = () => {
   return { from: new Date(to.getTime() - 86400000).toISOString(), to: to.toISOString() };
 };
 
+export function downloadCsv(filename, rows) {
+  if (!rows?.length) return;
+  const columns = Object.keys(rows[0]);
+  const cell = value => {
+    const text = value == null ? '' : value instanceof Date ? value.toISOString() : String(value);
+    return `"${text.replaceAll('"', '""')}"`;
+  };
+  const csv = [columns.map(cell).join(';'), ...rows.map(row => columns.map(key => cell(row[key])).join(';'))].join('\r\n');
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // ---------- Libellés des méthodes de détection (analytics-service) ----------
 export const METHOD_LABELS = {
   THRESHOLD: 'Seuil Pmax',

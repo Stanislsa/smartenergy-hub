@@ -76,6 +76,8 @@ export const api = {
   sensors: (filters = {}) => request(`/api/sensors${qs(filters)}`),
   sensor: id => request(`/api/sensors/${enc(id)}`),
   createSensor: body => request('/api/sensors', { method: 'POST', body: JSON.stringify(body) }),
+  updateSensor: (id, body) =>
+    request(`/api/sensors/${enc(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
   dailySummary: (id, date) => request(`/api/sensors/${enc(id)}/daily-summary${qs({ date })}`),
 
   // --- Mesures (Cassandra, analytics-service) ---
@@ -94,7 +96,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ sensor_id: sensorId, horizon_minutes: horizonMinutes }),
     }),
+  forecastLSTM: (sensorId, horizonMinutes) =>
+    request('/ai/api/v1/lstm-forecasts/predict', {
+      method: 'POST',
+      body: JSON.stringify({ sensor_id: sensorId, horizon_minutes: horizonMinutes }),
+    }),
   modelStatus: () => request('/ai/api/v1/model/status'),
+  forecastInfo: (sensorId, model = 'rf') =>
+    request(`/ai/api/v1/${model === 'lstm' ? 'lstm-forecasts' : 'forecasts'}/info${qs({ sensor_id: sensorId })}`),
 
   // --- Santé des services ---
   health: service => request(`/svc/${service}/health`),

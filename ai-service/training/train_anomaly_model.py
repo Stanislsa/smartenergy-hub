@@ -101,7 +101,9 @@ class AnomalyModelTrainer:
             "model_type": "IsolationForest",
             "features": self.features,
             "contamination": 0.1,
-            "trained_at": datetime.now().isoformat()
+            "trained_at": datetime.now().astimezone().isoformat(),
+            "training_samples": int(self.model.n_samples_fit_),
+            "test_samples": 0
         }
         
         metadata_path = os.path.join(output_dir, "metadata.json")

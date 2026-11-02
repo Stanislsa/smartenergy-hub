@@ -9,6 +9,8 @@ import History from './pages/History';
 import Anomalies from './pages/Anomalies';
 import DailySummary from './pages/DailySummary';
 import Forecast from './pages/Forecast';
+import SensorDetail from './pages/SensorDetail';
+import Settings from './pages/Settings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { queryClient } from './lib/queryClient';
 import Login from './pages/Login';
@@ -25,10 +27,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
               <Route index element={<Dashboard />} />
               <Route path="capteurs" element={<Sensors />} />
+              <Route path="capteurs/:sensorId" element={<SensorDetail />} />
               <Route path="historique" element={<History />} />
               <Route path="anomalies" element={<Anomalies />} />
               <Route path="resume" element={<DailySummary />} />
               <Route path="prevision" element={<Forecast />} />
+              <Route path="parametres" element={<Settings />} />
             </Route>
           </Routes>
         </BrowserRouter>

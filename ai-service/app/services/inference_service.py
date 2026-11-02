@@ -21,27 +21,27 @@ class InferenceService:
             score = max(score, 0.8)
         
         # Vérification tension
-        if measurement.voltage:
+        if measurement.voltage is not None:
             if measurement.voltage < self.settings.voltage_min or measurement.voltage > self.settings.voltage_max:
                 reasons.append(f"Tension hors plage: {measurement.voltage} V")
                 is_anomaly = True
                 score = max(score, 0.7)
         
         # Vérification température
-        if measurement.temperature and measurement.temperature > self.settings.temperature_max:
+        if measurement.temperature is not None and measurement.temperature > self.settings.temperature_max:
             reasons.append(f"Température excessive: {measurement.temperature} °C")
             is_anomaly = True
             score = max(score, 0.9)
         
         # Utiliser le modèle ML si disponible
-        if measurement.voltage and measurement.temperature:
+        if measurement.voltage is not None and measurement.temperature is not None:
             features = np.array([[measurement.power_kw, measurement.voltage, measurement.temperature]])
-            ml_score = self.detector.predict(features)[0]
-            # IsolationForest retourne des scores négatifs (anomalie) et positifs (normal)
-            # On convertit en score 0-1
-            ml_anomaly_score = 1 / (1 + np.exp(ml_score))
-            
-            if ml_anomaly_score < 0.3:  # Seuil d'anomalie
+            ml_is_anomaly = self.detector.classify(features)[0] == -1
+            # decision_function est négative sous le seuil appris par Isolation Forest.
+            decision_score = float(self.detector.decision_scores(features)[0])
+            ml_anomaly_score = float(1 / (1 + np.exp(np.clip(decision_score, -50, 50))))
+
+            if self.detector.is_trained and ml_is_anomaly:
                 reasons.append("Anomalie détectée par modèle ML")
                 is_anomaly = True
                 score = max(score, ml_anomaly_score)
@@ -55,5 +55,5 @@ class InferenceService:
             anomaly_score=score,
             severity=severity,
             reasons=reasons,
-            model_version="rules-v1"
+            model_version="isolation-forest-v1" if self.detector.is_trained else "rules-v1"
         )

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from app.schemas.prediction import ForecastRequest, ForecastResponse
 from app.services.lstm_forecast_service import LSTMForecastService
 from app.services.cassandra_service import CassandraService
 from app.preprocessing.features import to_hourly
 import numpy as np
-from datetime import datetime, timedelta
+import pandas as pd
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
 lstm_service = LSTMForecastService()
@@ -36,10 +37,20 @@ async def predict_lstm_forecast(request: ForecastRequest):
         # Regrouper par heure
         df_hourly = to_hourly(measurements)
         
-        if len(df_hourly) < hours_needed:
+        if df_hourly.empty:
             raise HTTPException(
                 status_code=422,
-                detail=f"Données horaires insuffisantes: besoin de {hours_needed}h, reçu {len(df_hourly)}h"
+                detail="Aucune donnée horaire exploitable pour le LSTM"
+            )
+
+        # Construire une séquence régulière : 168 observations espacées d'une heure.
+        latest_hour = df_hourly.index.max().floor("h")
+        expected_hours = pd.date_range(end=latest_hour, periods=hours_needed, freq="h", tz="UTC")
+        df_hourly = df_hourly.reindex(expected_hours).interpolate(method="time", limit=2)
+        if df_hourly["power_kw"].isna().any():
+            raise HTTPException(
+                status_code=422,
+                detail="Historique LSTM incomplet: il manque plus de deux heures consécutives"
             )
         
         # Créer les features temporelles
@@ -50,20 +61,29 @@ async def predict_lstm_forecast(request: ForecastRequest):
         
         # Sélectionner les 168 dernières heures
         feature_cols = ['power_kw', 'voltage', 'temperature', 'hour', 'day_of_week', 'is_weekend', 'month']
-        available_cols = [c for c in feature_cols if c in df_hourly.columns]
-        features_array = df_hourly[available_cols].tail(hours_needed).values
+        # Le scaler est entraîné sur ces sept colonnes dans cet ordre.
+        # Les capteurs peuvent omettre les champs facultatifs voltage/température.
+        for col in ['voltage', 'temperature']:
+            if col not in df_hourly.columns:
+                df_hourly[col] = 230.0 if col == 'voltage' else 35.0
+            median = df_hourly[col].median()
+            fallback = 230.0 if col == 'voltage' else 35.0
+            df_hourly[col] = df_hourly[col].fillna(median if np.isfinite(median) else fallback)
         
-        print(f"Features array shape: {features_array.shape}, Columns: {available_cols}")
+        features_array = df_hourly[feature_cols].tail(hours_needed).values
+        
+        if features_array.shape != (hours_needed, len(feature_cols)):
+            raise HTTPException(status_code=422, detail="Séquence de caractéristiques LSTM invalide")
         
         # Prédire avec le modèle spécifique au capteur
         prediction = lstm_service.predict(features_array, request.horizon_minutes, sensor_id=request.sensor_id)
         
         return ForecastResponse(
             sensor_id=request.sensor_id,
-            forecast_start=datetime.utcnow(),
+            forecast_start=datetime.now(timezone.utc),
             horizon_minutes=request.horizon_minutes,
             forecast_series=prediction["forecast_series"],
-            model_version="lstm-v1"
+            model_version=lstm_service.get_model_info().get("version", "lstm-v1")
         )
     except FileNotFoundError as e:
         raise HTTPException(
@@ -72,11 +92,18 @@ async def predict_lstm_forecast(request: ForecastRequest):
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Erreur interne pendant la prévision LSTM")
 
 
 @router.get("/info")
-async def get_lstm_model_info():
+async def get_lstm_model_info(sensor_id: str | None = Query(default=None, min_length=1)):
     """Retourne les informations du modèle LSTM."""
-    return lstm_service.get_model_info()
+    try:
+        return lstm_service.get_model_info(sensor_id.strip() if sensor_id else None)
+    except FileNotFoundError:
+        return {"status": "not_available", "model_type": "LSTM"}
+    except RuntimeError as error:
+        return {"status": "not_available", "model_type": "LSTM", "message": str(error)}

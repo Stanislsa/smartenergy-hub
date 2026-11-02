@@ -16,8 +16,10 @@ import {
   ArrowUp,
   BarChart3,
   Database,
+  Download,
   Gauge,
   ListOrdered,
+  Printer,
   RefreshCw,
   RotateCcw,
   Zap,
@@ -46,6 +48,7 @@ import {
   timeShort,
   todayIso,
   withUnit,
+  downloadCsv,
 } from '../utils';
 
 // Pour chaque capteur actif :
@@ -105,6 +108,14 @@ export default function DailySummary() {
     queryFn: () => loadDay(date),
     staleTime: 60 * 1000,
   });
+  const previousDate = new Date(`${date}T00:00:00Z`);
+  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
+  const comparisonIso = previousDate.toISOString().slice(0, 10);
+  const { data: previousSummary } = useQuery({
+    queryKey: ['dailySummaryComparison', comparisonIso],
+    queryFn: () => loadDay(comparisonIso),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const withData = useMemo(
     () => (summaryData || []).filter(r => r.source !== 'error' && (r.measurements ?? 1) > 0),
@@ -131,6 +142,8 @@ export default function DailySummary() {
         .slice(0, 3),
     [withData]
   );
+  const previousEnergy = (previousSummary || []).reduce((total, row) => total + (row.source === 'error' ? 0 : row.energy || 0), 0);
+  const energyChange = previousEnergy > 0 ? ((totals?.energy || 0) - previousEnergy) / previousEnergy * 100 : null;
   const byMethod = useMemo(() => {
     const c = {};
     withData.forEach(r => r.anomalyList.forEach(a => (c[a.method] = (c[a.method] || 0) + 1)));
@@ -190,9 +203,11 @@ export default function DailySummary() {
         title={`Résumé du ${label}`}
         subtitle="Synthèse des mesures et des anomalies de la journée (UTC)"
         actions={
-          <button className="icon-btn" onClick={() => refetch()} title="Actualiser">
-            <RefreshCw size={18} />
-          </button>
+          <>
+            <button className="btn ghost sm" disabled={!summaryData?.length} onClick={() => downloadCsv(`resume-energetique-${date}.csv`, (summaryData || []).map(row => ({ date, capteur: row.sensor.sensorId, nom: row.sensor.name, energie_kWh: row.energy, moyenne_kW: row.avg, maximum_kW: row.max, mesures: row.measurements, anomalies: row.anomalyCount, statut: row.source })))}><Download size={14} /> CSV</button>
+            <button className="btn ghost sm" onClick={() => window.print()}><Printer size={14} /> PDF</button>
+            <button className="icon-btn" onClick={() => refetch()} title="Actualiser"><RefreshCw size={18} /></button>
+          </>
         }
         isFetching={isFetching}
       >
@@ -223,7 +238,7 @@ export default function DailySummary() {
             label="Énergie totale estimée"
             value={num(totals.energy, 1)}
             unit="kWh"
-            sub="E ≈ Σ Pi·Δt, capteurs actifs"
+            sub={energyChange == null ? `E ≈ Σ Pi·Δt · comparaison ${comparisonIso}` : `${energyChange > 0 ? '+' : ''}${num(energyChange, 1)} % vs veille (${num(previousEnergy, 1)} kWh)`}
           />
           <Kpi
             icon={Gauge}
