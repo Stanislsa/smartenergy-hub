@@ -1,0 +1,16 @@
+Mise à jour complète du projet - corrections frontend et backend
+
+Frontend:
+- Améliorations Dashboard, Forecast, History, Sensors
+- Mise à jour services.js et utils.js
+- Ajout pages SensorDetail et Settings
+- Améliorations styles.css
+
+Backend AI:
+- Corrections forecasts.py et lstm_forecasts.py
+- Mise à jour anomaly_detector.py
+
+Backend Storage:
+- Corrections CassandraTestController
+- Mise à jour MeasurementKey et MeasurementRepository
+- Mise à jour CassandraMeasurementService
