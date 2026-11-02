@@ -1,6 +1,0 @@
-Ajouter le frontend dans Docker Compose
-
-- Créer Dockerfile pour le frontend (build multi-stage avec nginx)
-- Ajouter configuration nginx pour proxy API
-- Ajouter service frontend dans docker-compose.yml
-- Corriger l'ordre des routes nginx (spécifiques avant générales)
