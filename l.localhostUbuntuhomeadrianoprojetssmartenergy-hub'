@@ -1,0 +1,24 @@
+warning: in the working copy of 'frontend/index.html', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'frontend/vite.config.js', CRLF will be replaced by LF the next time Git touches it
+ ai-service/app/api/forecasts.py                                |   4 [32m+[m
+ ai-service/app/models/anomaly_detector.py                      |   4 [32m+[m[31m-[m
+ ai-service/tests/test_forecasts.py                             |   4 [32m+[m[31m-[m
+ ai-service/tests/test_model.py                                 |   6 [32m+[m[31m-[m
+ analytics-service/pom.xml                                      |  11 [32m+[m
+ .../smartenergyhub/analytics/AnalyticsServiceApplication.java  |   2 [32m+[m
+ .../smartenergyhub/analytics/controller/SensorController.java  |   6 [32m+[m[31m-[m
+ .../analytics/measurement/MeasurementRecordRepository.java     |   7 [32m+[m
+ .../smartenergyhub/analytics/service/DailySummaryService.java  |  12 [32m+[m[31m-[m
+ .../analytics/service/MeasurementQueryService.java             |  26 [32m+++[m
+ analytics-service/src/main/resources/application.properties    |   7 [32m+[m[31m-[m
+ docker-compose.yml                                             |  13 [32m++[m
+ frontend/index.html                                            |   5 [32m+[m[31m-[m
+ frontend/package-lock.json                                     | 321 [32m++++++++++++++[m[31m-------------[m
+ frontend/src/api/client.js                                     |  29 [32m+++[m
+ frontend/src/components/Layout.jsx                             |   3 [32m+[m
+ frontend/src/components/LogoutButton.jsx                       |   4 [32m+[m[31m-[m
+ frontend/src/main.jsx                                          |   4 [32m+[m[31m-[m
+ frontend/src/pages/Dashboard.jsx                               |   6 [32m+[m[31m-[m
+ frontend/src/styles.css                                        |  69 [32m++++++[m
+ frontend/vite.config.js                                        |   2 [32m+[m[31m-[m
+ 21 files changed, 369 insertions(+), 176 deletions(-)

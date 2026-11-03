@@ -205,8 +205,7 @@ export default function Dashboard() {
           <PowerChart sensors={dashboardData.sensors.filter(s => s.active)} period={{ from, to }} />
           <Card title="Répartition des capteurs par bâtiment" icon={Activity}>
             <div className="donut-wrap">
-              <ResponsiveContainer width={170} height={170}>
-                <PieChart>
+              <PieChart width={170} height={170}>
                   <Pie
                     data={byBuilding}
                     dataKey="value"
@@ -219,8 +218,7 @@ export default function Dashboard() {
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              </PieChart>
               <div className="donut-center">
                 <b>{dashboardData.sensors.length}</b>
                 <span>capteurs</span>

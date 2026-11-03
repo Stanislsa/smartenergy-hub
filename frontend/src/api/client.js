@@ -90,6 +90,13 @@ export const api = {
   anomalies: (id, from, to) =>
     request(`/api/analytics/${enc(id)}/anomalies/all${qs({ from, to })}`),
 
+  // --- Exports en flux (analytics-service) ---
+  exportHistory: () => request('/api/export/history'),
+  exportPreview: (sensorId, from, to) => request('/api/export/preview/measurements' + qs({ sensorId, from, to })),
+  exportSchedules: () => request('/api/export/schedules'),
+  createExportSchedule: body => request('/api/export/schedules', { method: 'POST', body: JSON.stringify(body) }),
+  updateExportSchedule: (id, enabled) => request('/api/export/schedules/' + enc(id), { method: 'PATCH', body: JSON.stringify({ enabled }) }),
+  deleteExportSchedule: id => request('/api/export/schedules/' + enc(id), { method: 'DELETE' }),
   // --- Service IA (FastAPI) ---
   forecast: (sensorId, horizonMinutes) =>
     request('/ai/api/v1/forecasts/predict', {
@@ -116,4 +123,26 @@ export async function settle(promise) {
   } catch (error) {
     return { ok: false, error };
   }
+}
+
+
+export async function downloadExport(kind, params, signal) {
+  const token = getToken();
+  const response = await fetch('/api/export/' + kind + qs(params), {
+    headers: token ? { Authorization: 'Bearer ' + token } : {},
+    signal,
+  });
+  if (response.status === 401 && token) clearSession();
+  if (!response.ok) {
+    const text = await response.text();
+    let message = 'Erreur ' + response.status;
+    try {
+      const body = JSON.parse(text);
+      message = body.message || body.detail || body.error || message;
+    } catch {
+      if (text) message = text;
+    }
+    throw new ApiError(response.status, message);
+  }
+  return response;
 }

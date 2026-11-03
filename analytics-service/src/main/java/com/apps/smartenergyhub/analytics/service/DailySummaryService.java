@@ -18,15 +18,15 @@ public class DailySummaryService {
     private final SensorService sensorService;
 
     public DailySummaryResponse get(String sensorId, LocalDate date) {
-        sensorService.requireExists(sensorId);
+        return find(sensorId, date).orElseThrow(() -> new ResourceNotFoundException(
+                "Aucun résumé quotidien pour " + sensorId + (date != null ? " le " + date : "")));
+    }
 
+    public Optional<DailySummaryResponse> find(String sensorId, LocalDate date) {
+        sensorService.requireExists(sensorId);
         Optional<DailySummary> found = (date == null)
                 ? repository.findFirstBySensorIdOrderByDateDesc(sensorId)
                 : repository.findBySensorIdAndDate(sensorId, date.toString());
-
-        DailySummary summary = found.orElseThrow(() -> new ResourceNotFoundException(
-                "Aucun résumé quotidien pour " + sensorId + (date != null ? " le " + date : "")));
-
-        return DailySummaryResponse.from(summary);
+        return found.map(DailySummaryResponse::from);
     }
 }

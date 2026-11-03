@@ -75,10 +75,12 @@ public class SensorController {
 
     @GetMapping("/{sensorId}/daily-summary")
     @Operation(summary = "Résumé quotidien (le plus récent si 'date' est absente)")
-    public DailySummaryResponse dailySummary(
+    public ResponseEntity<DailySummaryResponse> dailySummary(
             @PathVariable String sensorId,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return summaryService.get(sensorId, date);
+        return summaryService.find(sensorId, date)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }

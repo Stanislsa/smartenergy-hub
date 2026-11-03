@@ -21,9 +21,11 @@ def test_anomaly_detector_train():
     assert detector.is_trained == True
 
 
-def test_anomaly_detector_predict_untrained():
-    """Test de prédiction sans entraînement"""
+def test_anomaly_detector_predict_untrained(tmp_path):
+    """Test de prédiction sans entraînement, isolé des modèles du dépôt."""
     detector = AnomalyDetector()
+    detector.model_path = str(tmp_path / "missing-model.joblib")
+    detector.scaler_path = str(tmp_path / "missing-scaler.joblib")
     X = np.random.randn(10, 3)
     
     scores = detector.predict(X)
