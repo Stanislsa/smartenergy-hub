@@ -24,8 +24,10 @@ class AnomalyDetector:
         print(f"Modèle d'anomalies chargé: {self.model_path}")
     
     def train(self, X: np.ndarray):
+        self.scaler = StandardScaler()
+        scaled = self.scaler.fit_transform(X)
         self.model = IsolationForest(contamination=0.1, random_state=42)
-        self.model.fit(X)
+        self.model.fit(scaled)
         self.is_trained = True
     
     def predict(self, X: np.ndarray) -> np.ndarray:

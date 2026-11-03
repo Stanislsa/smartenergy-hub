@@ -7,6 +7,8 @@ import org.springframework.data.cassandra.repository.Query;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 
 public interface MeasurementRecordRepository extends CassandraRepository<MeasurementRecord, MeasurementRowKey> {
 
@@ -14,6 +16,11 @@ public interface MeasurementRecordRepository extends CassandraRepository<Measure
     @Query("SELECT * FROM measurements_by_sensor_day "
             + "WHERE sensor_id = ?0 AND day = ?1 AND measured_at >= ?2 AND measured_at < ?3 LIMIT 5000")
     List<MeasurementRecord> findInPartitionBetween(String sensorId, LocalDate day, Instant from, Instant to);
+
+    /** Export paginé d'une partition (Cassandra avance avec un paging state, sans OFFSET). */
+    @Query("SELECT * FROM measurements_by_sensor_day "
+            + "WHERE sensor_id = ?0 AND day = ?1 AND measured_at >= ?2 AND measured_at < ?3")
+    Slice<MeasurementRecord> findPageInPartitionBetween(String sensorId, LocalDate day, Instant from, Instant to, Pageable pageable);
 
     /** La mesure la plus récente d'une journée. */
     @Query("SELECT * FROM measurements_by_sensor_day WHERE sensor_id = ?0 AND day = ?1 LIMIT 1")

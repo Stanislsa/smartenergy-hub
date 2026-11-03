@@ -1,6 +1,7 @@
 package com.apps.smartenergyhub.analytics;
 
 import org.springframework.boot.SpringApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
@@ -8,6 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * Ce service fournit une API de lecture pour l'analyse des données énergétiques.
  */
 @SpringBootApplication
+@EnableScheduling
 public class AnalyticsServiceApplication {
 
     /**
