@@ -10,11 +10,15 @@
 //   node scripts/load/send-measurements.mjs                       1 mesure/s, sans fin (Ctrl+C pour arrêter)
 //   node scripts/load/send-measurements.mjs --rate 20 --duration 60   expérience de charge : 20 mesures/s pendant 60 s
 //   node scripts/load/send-measurements.mjs --spike 0.01          1 % de mesures en pic (puissance > maxPowerKw)
+//   node scripts/load/send-measurements.mjs --sensors 5 --duration 120   test du sujet (§10.2) : 5 capteurs pendant 2 min,
+//                                                                  puis comparaison avec le compteur du Collector
 //   node scripts/load/send-measurements.mjs --backfill-hours 24   historique des 24 dernières heures (1 mesure / 5 min
 //                                                                  par capteur), envoyé au Collector, puis arrêt
 //
 // Options : --rate <mesures/s> (défaut 1), --duration <s> (défaut : sans fin), --spike <0..1> (défaut 0),
 //           --backfill-hours <h> (historique, max 168 ; envoi à 50 mesures/s),
+//           --sensors <n> (nombre de capteurs simulés : capteurs actifs de MongoDB, complétés si besoin par des
+//           capteurs SIM-001, SIM-002... absents de MongoDB ; défaut : les capteurs actifs de MongoDB),
 //           --collector <url> (défaut http://localhost:8081), --analytics <url> (défaut http://localhost:8083)
 
 import { generateMeasurement } from './profile.mjs'
@@ -31,6 +35,7 @@ const RATE = Number(args.rate ?? 1)
 const DURATION = args.duration ? Number(args.duration) : null
 const SPIKE = Number(args.spike ?? 0)
 const BACKFILL = args['backfill-hours'] ? Number(args['backfill-hours']) : null
+const SENSORS = args.sensors ? Number(args.sensors) : null
 const COLLECTOR = args.collector ?? 'http://localhost:8081'
 const ANALYTICS = args.analytics ?? 'http://localhost:8083'
 
@@ -38,6 +43,7 @@ if (!(RATE > 0) || RATE > 500) exit('--rate doit être compris entre 0 et 500 me
 if (DURATION !== null && !(DURATION > 0)) exit('--duration doit être un nombre de secondes positif')
 if (!(SPIKE >= 0 && SPIKE <= 1)) exit('--spike doit être compris entre 0 et 1')
 if (BACKFILL !== null && !(BACKFILL > 0 && BACKFILL <= 168)) exit('--backfill-hours doit être compris entre 1 et 168')
+if (SENSORS !== null && !(Number.isInteger(SENSORS) && SENSORS >= 1 && SENSORS <= 100)) exit('--sensors doit être un entier entre 1 et 100')
 
 function exit(msg) {
   console.error(`Erreur : ${msg}`)
@@ -52,7 +58,7 @@ function measurement(sensor, t) {
 }
 
 // ---------- Statistiques ----------
-const stats = { sent: 0, accepted: 0, rejected: 0, failed: 0, spikes: 0, latencies: [], codes: {} }
+const stats = { sent: 0, accepted: 0, rejected: 0, failed: 0, spikes: 0, latencies: [], codes: {}, perSensor: {} }
 let window = { sent: 0, accepted: 0, latencies: [] }
 
 function percentile(list, p) {
@@ -79,6 +85,7 @@ async function send(sensor, t = new Date()) {
     stats.codes[res.status] = (stats.codes[res.status] || 0) + 1
     if (res.status === 202) {
       stats.accepted++
+      stats.perSensor[body.sensorId] = (stats.perSensor[body.sensorId] || 0) + 1
       window.accepted++
     } else {
       stats.rejected++
@@ -112,6 +119,7 @@ function printSummary(elapsed) {
   console.log(`Refusées (autre code): ${stats.rejected}`)
   console.log(`Échecs réseau        : ${stats.failed}`)
   console.log(`Codes HTTP           : ${JSON.stringify(stats.codes)}`)
+  console.log(`Acceptées par capteur: ${Object.entries(stats.perSensor).map(([id, n]) => `${id} ${n}`).join(', ')}`)
   console.log(`Latence (ms)         : moy. ${avg.toFixed(1)}, p50 ${percentile(l, 50).toFixed(1)}, p95 ${percentile(l, 95).toFixed(1)}, p99 ${percentile(l, 99).toFixed(1)}, max ${(l.length ? Math.max(...l) : 0).toFixed(1)}`)
 }
 
@@ -126,7 +134,43 @@ try {
 }
 if (!sensors.length) exit('aucun capteur actif dans MongoDB')
 
-console.log(`Capteurs actifs (MongoDB) : ${sensors.map((s) => `${s.sensorId} (Pmax ${s.maxPowerKw} kW)`).join(', ')}`)
+// --sensors : nombre de capteurs simulés. On garde les capteurs actifs de MongoDB et, s'il en manque, on ajoute des
+// capteurs SIM-001, SIM-002... (absents de MongoDB : leurs mesures sont stockées mais l'Analytics ne les connaît pas)
+if (SENSORS !== null) {
+  const pmax = sensors.reduce((a, s) => a + s.maxPowerKw, 0) / sensors.length
+  const extra = []
+  for (let i = 1; sensors.length + extra.length < SENSORS; i++) {
+    extra.push({ sensorId: `SIM-${String(i).padStart(3, '0')}`, maxPowerKw: Math.round(pmax * 10) / 10, active: true })
+  }
+  sensors = sensors.slice(0, SENSORS).concat(extra)
+  if (extra.length) console.log(`Capteurs simulés ajoutés (hors MongoDB) : ${extra.map((s) => s.sensorId).join(', ')}`)
+}
+
+// Compteur du Collector (Actuator) : nombre de mesures acceptées, pour comparer avec ce que le script a envoyé
+async function collectorAccepted() {
+  try {
+    const res = await fetch(`${COLLECTOR}/actuator/metrics/energy.measurements?tag=outcome:accepted`)
+    if (!res.ok) return null
+    return (await res.json()).measurements?.find((m) => m.statistic === 'COUNT')?.value ?? null
+  } catch {
+    return null
+  }
+}
+const acceptedBefore = await collectorAccepted()
+async function printCollectorCheck() {
+  const after = await collectorAccepted()
+  if (acceptedBefore === null || after === null) {
+    console.log('Compteur du Collector : indisponible (Actuator injoignable)')
+    return
+  }
+  const received = after - acceptedBefore
+  console.log(
+    `Reçues par le Collector : ${received} (compteur energy.measurements, outcome=accepted)` +
+      ` ; envoyées et acceptées : ${stats.accepted}${received === stats.accepted ? ' -> identique' : ' -> ÉCART (autre envoi en parallèle ?)'}`,
+  )
+}
+
+console.log(`Capteurs utilisés : ${sensors.map((s) => `${s.sensorId} (Pmax ${s.maxPowerKw} kW)`).join(', ')}`)
 
 // ---------- Mode historique : une mesure toutes les 5 min par capteur sur les dernières heures ----------
 if (BACKFILL !== null) {
@@ -147,6 +191,7 @@ if (BACKFILL !== null) {
   }
   clearInterval(reporter)
   printSummary((performance.now() - started) / 1000)
+  await printCollectorCheck()
   process.exit(stats.failed > 0 && stats.accepted === 0 ? 1 : 0)
 }
 console.log(
@@ -181,6 +226,7 @@ async function stop() {
   clearInterval(reporter)
   await Promise.allSettled([...pending])
   printSummary((performance.now() - started) / 1000)
+  await printCollectorCheck()
   process.exit(stats.failed > 0 && stats.accepted === 0 ? 1 : 0)
 }
 process.on('SIGINT', stop)

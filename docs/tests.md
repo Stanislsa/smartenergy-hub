@@ -8,7 +8,7 @@ de `docs/api-recomandation.md` (section 6). Responsable : partie D.
 
 | Élément | Valeur |
 |---|---|
-| Bases | `docker compose up -d` : MongoDB (27018), Redis (6380), Cassandra (9042) |
+| Bases | `docker compose --profile ai up -d mongo redis cassandra` : MongoDB (27018), Redis (6380), Cassandra (9042) |
 | Initialisation | `scripts/init-cassandra.cql`, `scripts/init-mongo.js` |
 | Services | Collector 8081 (Salomi), Storage 8082 (Stan), Analytics 8083 (Lalia, Tiana) |
 | Données de test | `scripts/test-data/` (mesures JSON et CQL) |
@@ -18,9 +18,9 @@ de `docs/api-recomandation.md` (section 6). Responsable : partie D.
 Lancement des services, un terminal par service, depuis la racine du dépôt :
 
 ```cmd
-mvnw.cmd -pl storage-service spring-boot:run "-Dspring-boot.run.jvmArguments=-Xmx384m"
-mvnw.cmd -pl collector-service spring-boot:run "-Dspring-boot.run.jvmArguments=-Xmx256m"
-mvnw.cmd -pl analytics-service spring-boot:run "-Dspring-boot.run.jvmArguments=-Xmx384m"
+mvn -pl storage-service spring-boot:run "-Dspring-boot.run.jvmArguments=-Xmx384m"
+mvn -pl collector-service spring-boot:run "-Dspring-boot.run.jvmArguments=-Xmx256m"
+mvn -pl analytics-service spring-boot:run "-Dspring-boot.run.jvmArguments=-Xmx384m"
 ```
 
 Commandes de vérification utilisées dans les scénarios :
@@ -263,6 +263,25 @@ Obtenu (29/10/2026) :
 
 ✅
 
+### S1 — Simulateur : 5 capteurs pendant 2 minutes (sujet 10.2)
+
+Le sujet demande de lancer 5 capteurs simulés pendant au moins 2 minutes et de vérifier le nombre de requêtes reçues.
+Simulateur : `scripts/load/send-measurements.mjs`. MongoDB ne contient que 2 capteurs actifs (SENSOR-001 et
+SENSOR-002) : l'option `--sensors 5` les complète par SIM-001 à SIM-003, absents de MongoDB.
+
+```cmd
+node scripts/load/send-measurements.mjs --sensors 5 --rate 1 --duration 120 --spike 0.05
+```
+
+`--rate 1` : une mesure par seconde au total, donc une mesure toutes les 5 s par capteur. `--spike 0.05` active le
+scénario d'anomalie (5 % de pics au-dessus du Pmax). En fin d'exécution, le script compare ses envois au compteur du
+Collector (`energy.measurements`, `outcome=accepted`, relu avant et après l'essai).
+
+Attendu : environ 120 mesures envoyées (24 par capteur), toutes acceptées (`202`), et le même nombre reçu par le
+Collector.
+
+Obtenu : _à compléter après exécution (bilan du script)._
+
 ### Couverture des tests d'intégration (sujet 22.2)
 
 | Chemin | Couvert par |
@@ -277,9 +296,14 @@ Obtenu (29/10/2026) :
 
 | Service | Tests | Résultat |
 |---|---|---|
-| analytics-service | 67 (calculs, anomalies, lecture Cassandra, résumés quotidiens, service, contrôleurs) | ✅ BUILD SUCCESS (24/10/2026, avec Actuator) |
-| collector-service | 11 (8 validation du DTO, 3 métriques `energy.measurements`) | ✅ BUILD SUCCESS (28/10/2026) |
-| storage-service | aucun (Maven : `No sources to compile` pour les tests) | — |
+| analytics-service | 72 (calculs, anomalies, lecture Cassandra, résumés quotidiens, service, contrôleurs, règles de sécurité) | ✅ BUILD SUCCESS (02/11/2026) |
+| collector-service | validation du DTO (plages et horodatage plausibles), métriques `energy.measurements` | ✅ BUILD SUCCESS (02/11/2026) |
+| storage-service | aucun | — |
+| frontend | 5 (composants d'interface, Vitest) | ✅ (02/11/2026) |
+| ai-service | 31 (pytest) | 28 réussis ; 3 échouent sans Cassandra lancée (déjà le cas avant la fusion du 02/11) |
+
+Commande : `mvn test` à la racine (les 3 services Java), `npm test` dans `frontend/`, `python -m pytest` dans
+`ai-service/`.
 
 ## 7. Observations
 

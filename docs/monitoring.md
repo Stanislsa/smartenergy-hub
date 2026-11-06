@@ -126,6 +126,8 @@ Le maximum de publication (≈ 939 ms) est un pic unique au démarrage à froid,
    Le 24/10 (avant le correctif C8), 100/s passait sans retard. Cause probable : lecture par lots de 100 messages suivie
    d'une pause d'1 s (`fixedDelay`). Aucune perte : les 3 000 mesures sont acceptées puis enregistrées. Piste (partie B) :
    relancer immédiatement la lecture tant qu'un lot est plein, ou augmenter `count`.
+   **Corrigé le 30/10 (Salomi)** : le Storage vide désormais le flux lot par lot à chaque cycle au lieu de lire un
+   seul lot par seconde. Troisième exécution à faire pour confirmer le débit : `node scripts/load/load-test.mjs --steps 5,20,50,100 --duration 30`.
 8. **Métriques métier cohérentes** : `energy.measurements` (accepted) = nombre de réponses 202 à chaque palier ;
    publication dans Redis ≈ 3 ms une fois la JVM chaude.
 
