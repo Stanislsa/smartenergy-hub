@@ -19,6 +19,7 @@ import {
   Sparkles,
   UserRound,
   Settings as SettingsIcon,
+  Download,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { recentAnomalies, useServices } from '../services';
@@ -30,6 +31,7 @@ const NAV = [
   { to: '/anomalies', label: 'Anomalies', icon: AlertTriangle, badge: true, section: 'PILOTAGE' },
   { to: '/resume', label: 'Résumé quotidien', icon: CalendarDays, section: 'ANALYSE' },
   { to: '/prevision', label: 'Prévisions IA', icon: LineChart, section: 'ANALYSE' },
+  { to: '/exports', label: 'Exports', icon: Download, section: 'ANALYSE' },
   { to: '/parametres', label: 'Paramètres', icon: SettingsIcon, section: 'COMPTE' },
 ];
 
@@ -40,6 +42,7 @@ const BREADCRUMBS = {
   '/anomalies': 'Anomalies',
   '/resume': 'Résumé quotidien',
   '/prevision': 'Prévisions',
+  '/exports': 'Exports',
   '/parametres': 'Paramètres',
 };
 

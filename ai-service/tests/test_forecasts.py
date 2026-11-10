@@ -9,7 +9,7 @@ client = TestClient(app)
 def test_forecast_model_not_loaded():
     """Test prévision sans modèle entraîné"""
     payload = {
-        "sensor_id": "SENSOR-001",
+        "sensor_id": "SENSOR-004",
         "horizon_minutes": 60
     }
     response = client.post("/api/v1/forecasts/predict", json=payload)
@@ -24,7 +24,7 @@ def test_forecast_invalid_horizon():
     """Test prévision avec horizon invalide"""
     payload = {
         "sensor_id": "SENSOR-002",
-        "horizon_minutes": 2000  # > 1440
+        "horizon_minutes": 10081  # > 7 jours
     }
     response = client.post("/api/v1/forecasts/predict", json=payload)
     assert response.status_code == 422  # Validation error

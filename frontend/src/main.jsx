@@ -11,6 +11,7 @@ import DailySummary from './pages/DailySummary';
 import Forecast from './pages/Forecast';
 import SensorDetail from './pages/SensorDetail';
 import Settings from './pages/Settings';
+import Exports from './pages/Exports';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { queryClient } from './lib/queryClient';
 import Login from './pages/Login';
@@ -21,7 +22,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="login" element={<Login />} />
             <Route element={<RequireAuth><Layout /></RequireAuth>}>
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="resume" element={<DailySummary />} />
               <Route path="prevision" element={<Forecast />} />
               <Route path="parametres" element={<Settings />} />
+              <Route path="exports" element={<Exports />} />
             </Route>
           </Routes>
         </BrowserRouter>

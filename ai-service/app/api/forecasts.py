@@ -26,6 +26,10 @@ async def predict_forecast(request: ForecastRequest):
     Convient pour les prévisions à court terme (heures/jours).
     """
     try:
+        # Valider d’abord la disponibilité du modèle afin qu’une panne Cassandra
+        # ne masque pas un modèle absent.
+        forecast_service.load_model(request.sensor_id)
+
         # Récupérer les features depuis Cassandra
         features = forecast_service.get_features_from_cassandra(request.sensor_id)
         

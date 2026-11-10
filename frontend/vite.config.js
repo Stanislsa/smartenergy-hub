@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
-      port: 5173,
+      port: 5174,
       proxy: {
         // Analytics (8083) : capteurs, mesures, analyses, résumés quotidiens
         '/api': { target: analytics, changeOrigin: true },
